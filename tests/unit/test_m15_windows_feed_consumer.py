@@ -1,8 +1,9 @@
-from contextlib import ExitStack
+from contextlib import ExitStack, redirect_stderr
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 import json
+import io
 from pathlib import Path
 import socket
 import sys
@@ -307,7 +308,11 @@ class WindowsFeedConsumerTests(unittest.TestCase):
         observed = []
         class Probe:
             ended = False
+            last_error = None
             def __init__(self, *args, **kwargs): pass
+            def write_status(self, **kwargs): pass
+            def record_error(self, error, **kwargs):
+                self.last_error = consumer.safe_exception(error)
             def check(self, **kwargs):
                 raise ValueError('wire_false_silence_before_read')
             def consume(self, row, **kwargs):
@@ -323,6 +328,85 @@ class WindowsFeedConsumerTests(unittest.TestCase):
             self.assertEqual(consumer.main(), 0)
         self.assertEqual(len(observed), 1)
         self.assertIsNone(json.loads((output/'summary.json').read_text())['reason'])
+
+    def test_known_runtime_reason_preserved_unknown_prefix_redacted(self):
+        self.assertEqual(consumer.safe_exception(RuntimeError('market_data_heartbeat_deadline_exceeded'))['code'],
+                         'market_data_heartbeat_deadline_exceeded')
+        for error in (RuntimeError('secret_token=abc'), ValueError('wire_private_token=abc'),
+                      ValueError('consumer_private_token=abc'), KeyError('secret_token=abc')):
+            safe = consumer.safe_exception(error)
+            self.assertEqual(safe['code'], 'unclassified_exception')
+            self.assertNotIn('abc', json.dumps(safe))
+        self.assertEqual(consumer.safe_exception(RuntimeError('sdk_stage_deadline_exceeded:daily_context'))['phase'],
+                         'daily_context')
+        result = consumer.safe_exception(RuntimeError('sdk_stage_deadline_exceeded:secret_token=abc'))
+        self.assertNotIn('abc', json.dumps(result))
+
+    def test_actual_heartbeat_failure_records_fixed_reason_and_live_terminal_status(self):
+        self.ready()
+        self.c.evidence.ready_since = consumer.time.monotonic()-60
+        self.c.evidence.last_progress = consumer.time.monotonic()-6
+        with self.assertRaisesRegex(RuntimeError, 'market_data_heartbeat_deadline_exceeded'):
+            self.c.check(now=self.now)
+        self.c.write_status(now=self.now, force=True)
+        state = json.loads((self.root/'evidence/live-status.json').read_text())
+        self.assertEqual(state['last_error']['code'], 'market_data_heartbeat_deadline_exceeded')
+        self.assertEqual(state['status'], 'failed')
+        self.assertEqual(self.c.summary()['reason'], 'market_data_heartbeat_deadline_exceeded')
+
+    def test_live_status_preserves_source_receipt_and_failed_attempt_identity(self):
+        self.ready()
+        self.now += timedelta(seconds=1)
+        self.quote('QQQ.US')
+        self.trades('QQQ.US')
+        last = self.c.last_consumed_sequence
+        source_receipt = self.now.isoformat()
+        self.c.write_status(now=self.now, force=True)
+        with self.assertRaises(ValueError):
+            self.c.consume(self.row('heartbeat', {}, sequence=last+5), now=self.now)
+        self.c.write_status(now=self.now+timedelta(seconds=10), force=True)
+        state = json.loads((self.root/'evidence/live-status.json').read_text())
+        self.assertEqual(state['last_consumed_sequence'], last)
+        self.assertEqual(state['attempted_sequence'], last+5)
+        self.assertEqual(state['last_source_receipt']['trade']['received_at'], source_receipt)
+        self.assertEqual(state['quote_wire_symbol_count'], 1)
+        self.assertEqual(state['trade_wire_symbol_count'], 1)
+        self.assertEqual(state['strategy_evaluation_count'], 0)
+
+    def test_status_replace_failure_is_fatal_redacted_and_first_fault_is_retained(self):
+        self.c.write_status(now=self.now, force=True)
+        before = (self.root/'evidence/live-status.json').read_bytes()
+        with patch.object(consumer.os, 'replace', side_effect=PermissionError('private_token=abc')):
+            with self.assertRaisesRegex(ValueError, 'consumer_status_write_failed'):
+                self.c.write_status(now=self.now, force=True)
+        self.assertEqual((self.root/'evidence/live-status.json').read_bytes(), before)
+        self.assertEqual(self.c.summary()['reason'], 'consumer_status_write_failed')
+        self.assertNotIn('abc', json.dumps(self.c.summary()))
+        self.c.record_error(RuntimeError('reference_market_data_stalled'))
+        self.assertEqual(self.c.last_error['code'], 'consumer_status_write_failed')
+        self.assertFalse(list((self.root/'evidence').glob('.live-status-*.tmp')))
+
+    def test_status_write_throttle_does_not_modify_source_fields(self):
+        with patch.object(consumer.os, 'replace', wraps=consumer.os.replace) as replace_file:
+            self.c.write_status(now=self.now)
+            self.c.write_status(now=self.now+timedelta(milliseconds=50))
+        self.assertEqual(replace_file.call_count, 1)
+        state = json.loads((self.root/'evidence/live-status.json').read_text())
+        self.assertEqual(state['last_source_receipt'], {})
+        self.assertIsNone(state['last_processed_at'])
+
+    def test_initialization_failure_emits_safe_evidence_without_unvalidated_write(self):
+        target = self.root/'must-not-exist'
+        args = ['consumer', '--stream', 'unused', '--config', 'unused', '--output-dir', str(target),
+                '--run-id', self.c.run_id, '--window-start-utc', self.start.isoformat(),
+                '--window-end-utc', self.end.isoformat()]
+        stderr = io.StringIO()
+        with patch.object(sys, 'argv', args), patch.object(consumer.rules, 'load_config',
+                side_effect=RuntimeError('private_token=abc')), redirect_stderr(stderr):
+            self.assertEqual(consumer.main(), 4)
+        self.assertFalse(target.exists())
+        self.assertNotIn('abc', stderr.getvalue())
+        self.assertEqual(json.loads(stderr.getvalue())['phase'], 'initializing')
 
 
 if __name__ == '__main__':

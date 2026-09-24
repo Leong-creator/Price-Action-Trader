@@ -14,6 +14,7 @@ import math
 import os
 from pathlib import Path
 import sys
+import tempfile
 import time
 from uuid import UUID
 
@@ -26,6 +27,66 @@ from scripts import m15_longbridge_sdk_runtime_lib as rules
 
 MAX_LINE_BYTES = 4 * 1024 * 1024
 MAX_PREFIX_BYTES = 16 * 1024 * 1024
+
+# Exact local codes only. Never copy an arbitrary exception message just because
+# it resembles one of our prefixes; native exceptions can contain private data.
+SAFE_ERROR_CODES = frozenset('''
+wire_timestamp_type wire_timestamp_must_be_utc wire_decimal_type
+wire_decimal_invalid wire_decimal_range wire_volume_not_integer wire_event_not_object
+wire_trades_not_list wire_trade_not_object wire_trade_classification_required
+wire_daily_volume_missing wire_identity_or_window_invalid wire_receipt_outside_window_or_emission
+wire_processing_backlog wire_receipt_in_future wire_message_after_end wire_run_id_mismatch
+wire_sequence_discontinuity wire_payload_not_object wire_emission_outside_window
+wire_emission_clock_regressed wire_emission_in_future wire_transfer_backlog
+wire_input_after_window_no_backfill wire_daily_after_subscription
+wire_daily_symbol_duplicate_or_unknown wire_daily_count_invalid wire_subscription_or_daily_incomplete
+wire_initial_snapshot_order wire_initial_snapshot_count wire_initial_snapshot_symbols
+wire_snapshot_must_not_be_push_quote wire_quote_timestamp_in_future wire_ready_order
+wire_market_event_before_ready wire_market_symbol_unknown wire_tail_receipt_invalid
+wire_tail_trade_for_closed_boundary wire_event_behind_watermark wire_quote_session_invalid
+wire_heartbeat_before_ready wire_watermark_outside_prefix wire_watermark_regressed
+wire_abnormal_end wire_premature_or_incomplete_end wire_producer_reported_error wire_unknown_kind
+consumer_clock_discontinuity consumer_status_write_failed consumer_summary_write_failed
+wire_end_deadline_exceeded wire_stream_symlink wire_reader_backlog_or_truncation
+wire_line_size_exceeded wire_watermark_in_future wire_trailing_content_after_end wire_partial_line_size_exceeded
+wire_nonfinite_json
+diagnostic_daily_context_not_current_or_complete diagnostic_stale_strategy_bar
+quote_worker_reported_failure bars_before_ready duplicate_boundary
+market_data_heartbeat_deadline_exceeded reference_market_data_stalled diagnostic_clock_discontinuity
+trade_timestamp_invalid trade_timestamp_in_future trade_after_bar_finalized
+trade_source_delivery_age_exceeded trade_processing_backlog invalid_boundary_timestamps
+invalid_boundary_rows reference_quotes_stale late_boundary_delivery invalid_boundary_provenance
+pipeline_config_must_use_external_paths pipeline_config_must_disable_dispatch
+diagnostics_must_not_write_production_output diagnostics_output_must_be_outside_worktree
+diagnostics_output_must_be_new_or_empty invalid_sdk_stage_start_time
+'''.split())
+SAFE_ERROR_TYPES = frozenset('''ValueError RuntimeError KeyError TypeError OSError
+FileNotFoundError PermissionError TimeoutError OverflowError JSONDecodeError
+UnicodeDecodeError KeyboardInterrupt SystemExit MemoryError'''.split())
+
+
+def safe_exception(error):
+    name = type(error).__name__
+    result = {'code': 'unclassified_exception', 'error_type': name if name in SAFE_ERROR_TYPES else 'Exception'}
+    message = str(error)
+    if type(error) in (ValueError, RuntimeError) and message in SAFE_ERROR_CODES:
+        result['code'] = message
+    elif type(error) is RuntimeError and message.startswith('sdk_stage_deadline_exceeded:'):
+        result['code'] = 'sdk_stage_deadline_exceeded'
+        phase = message.split(':', 1)[1]
+        if phase in ('initializing', 'daily_context', 'subscribing', 'initial_snapshot', 'streaming', 'daily_refresh'):
+            result['phase'] = phase
+    elif type(error) in (ValueError, RuntimeError) and message.startswith((
+            'realtime_bar_boundary_deadline_exceeded:', 'missing_boundary:')):
+        result['code'] = message.split(':', 1)[0]
+        try:
+            result['boundary_utc'] = stamp(message.split(':', 1)[1]).isoformat()
+        except (ValueError, TypeError, OverflowError):
+            pass
+    if error.__cause__ is not None:
+        cause = type(error.__cause__).__name__
+        result['cause_type'] = cause if cause in SAFE_ERROR_TYPES else 'Exception'
+    return result
 
 
 def stamp(value):
@@ -120,6 +181,15 @@ class FeedConsumer:
         self.end_sequence = None
         self.quote_source_times = {}
         self.quote_classifications = Counter()
+        self.last_consumed_sequence = 0
+        self.attempted_sequence = None
+        self.last_processed_at = None
+        self.last_consumed_watermark = None
+        self.last_source_receipt = {}
+        self.quote_wire_symbols, self.trade_wire_symbols = set(), set()
+        self.fresh_quote_symbols = set()
+        self.last_error = None
+        self._last_status_write = None
         self.started_wall, self.started_mono = now, time.monotonic()
 
     def _emit(self, message, now):
@@ -135,7 +205,38 @@ class FeedConsumer:
             raise ValueError('wire_receipt_in_future')
         return received
 
+    def record_error(self, error, *, now=None, during='runner'):
+        if self.last_error is None:
+            self.last_error = {**safe_exception(error), 'observed_at': stamp(now or datetime.now(UTC)).isoformat(),
+                'during': during, 'attempted_sequence': self.attempted_sequence,
+                'last_consumed_sequence': self.last_consumed_sequence}
+
     def consume(self, row, *, now=None):
+        now = stamp(now or datetime.now(UTC))
+        seq = row.get('sequence') if isinstance(row, dict) else None
+        self.attempted_sequence = seq if type(seq) is int and 0 < seq < 2**63 else None
+        try:
+            self._consume_record(row, now=now)
+        except BaseException as error:
+            self.record_error(error, now=now, during='consume')
+            raise
+        self.last_consumed_sequence = self.sequence
+        self.last_processed_at = now
+        kind, payload = row['kind'], row['payload']
+        if kind == 'watermark':
+            self.last_consumed_watermark = self.watermark
+        if kind in ('quote', 'trade') and now <= self.end:
+            received = stamp(payload['received_at'])
+            if self.start <= received < self.end:
+                events = [payload['event']] if kind == 'quote' else payload['event']['trades']
+                if events:
+                    covered = self.quote_wire_symbols if kind == 'quote' else self.trade_wire_symbols
+                    covered.add(payload['symbol'])
+                    self.last_source_receipt[kind] = {'received_at': received.isoformat(),
+                        'source_event_at': max(stamp(event['timestamp']) for event in events).isoformat(),
+                        'wire_sequence': self.sequence}
+
+    def _consume_record(self, row, *, now):
         now = stamp(now or datetime.now(UTC))
         if self.ended:
             raise ValueError('wire_message_after_end')
@@ -277,6 +378,7 @@ class FeedConsumer:
                     return
                 self.quote_source_times[symbol] = source
                 self.quote_classifications['fresh_quote'] += 1
+                self.fresh_quote_symbols.add(symbol)
                 self._emit({'kind': 'quote_state', 'symbol': symbol, 'payload': event,
                             'received_at': received.isoformat(), 'source_mode': 'official_sdk_push'}, now)
             else:
@@ -322,6 +424,13 @@ class FeedConsumer:
             raise ValueError('wire_unknown_kind')
 
     def check(self, *, now=None):
+        try:
+            self._check(now=now)
+        except BaseException as error:
+            self.record_error(error, now=now, during='deadline_check')
+            raise
+
+    def _check(self, *, now=None):
         now = stamp(now or datetime.now(UTC))
         elapsed = time.monotonic() - self.started_mono
         if not math.isfinite(elapsed) or abs((now - self.started_wall).total_seconds() - elapsed) > 2:
@@ -331,7 +440,54 @@ class FeedConsumer:
         if now <= self.end:
             self.evidence.check_deadlines(now)
 
+    def live_status(self, *, now=None):
+        session = self.evidence.session
+        return {'schema_version': 1, 'run_id': self.run_id,
+            'observed_at': stamp(now or datetime.now(UTC)).isoformat(),
+            'status': ('failed' if self.last_error else 'finished' if self.ended else
+                       'observing' if self.ready else 'initializing'),
+            'phase': self.evidence.stage_deadline.phase,
+            'last_consumed_sequence': self.last_consumed_sequence,
+            'attempted_sequence': self.attempted_sequence,
+            'last_processed_at': self.last_processed_at.isoformat() if self.last_processed_at else None,
+            'last_source_receipt': self.last_source_receipt,
+            'quote_wire_symbol_count': len(self.quote_wire_symbols),
+            'trade_wire_symbol_count': len(self.trade_wire_symbols),
+            'fresh_quote_symbol_count': len(self.fresh_quote_symbols),
+            'coverage_basis': 'cumulative_consumed_events_since_start_not_current_freshness',
+            'trade_count': self.trade_count,
+            'last_watermark': self.last_consumed_watermark.isoformat() if self.last_consumed_watermark else None,
+            'attempted_watermark': self.watermark.isoformat() if self.watermark else None,
+            'complete_boundary_count': session.complete_boundary_count if session else 0,
+            'bar_count': self.evidence.bar_count,
+            'strategy_evaluation_count': self.evidence.strategy.evaluations,
+            'producer_end_observed': self.ended, 'last_error': self.last_error,
+            'production_acceptance': False, 'full_session_acceptance': False}
+
+    def write_status(self, *, now=None, force=False):
+        mono = time.monotonic()
+        if not force and self._last_status_write is not None and mono - self._last_status_write < 1:
+            return
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=self.output,
+                    prefix='.live-status-', suffix='.tmp', delete=False) as out:
+                temporary = Path(out.name)
+                json.dump(self.live_status(now=now), out, separators=(',', ':'), allow_nan=False)
+                out.write('\n'); out.flush(); os.fsync(out.fileno())
+            os.replace(temporary, self.output/'live-status.json')
+            self._last_status_write = mono
+        except BaseException as error:
+            failure = ValueError('consumer_status_write_failed')
+            failure.__cause__ = error
+            self.record_error(failure, now=now, during='status_write')
+            raise failure from error
+        finally:
+            if temporary is not None and temporary.exists():
+                temporary.unlink()
+
     def summary(self, reason=None):
+        reason = self.last_error['code'] if self.last_error else reason
         strategy = self.evidence.strategy.summary()
         session = self.evidence.session
         boundaries = session.complete_boundary_count if session else 0
@@ -356,6 +512,8 @@ class FeedConsumer:
             'quote_classifications': dict(self.quote_classifications),
             'realtime_tradable_bar_count': traded, 'trade_count': self.trade_count,
             'last_sequence': self.sequence, 'message_counts': dict(self.counts),
+            'last_consumed_sequence': self.last_consumed_sequence,
+            'last_error': self.last_error,
             'last_watermark': self.watermark.isoformat() if self.watermark else None,
             'strategy_full_acceptance': False, 'full_session_acceptance': False,
             'production_acceptance': False, 'account_access': False, 'order_access': False, **strategy}
@@ -366,14 +524,20 @@ def main():
     for name in ('stream', 'config', 'output-dir', 'run-id', 'window-start-utc', 'window-end-utc'):
         parser.add_argument('--' + name, required=True)
     args = parser.parse_args()
-    config = rules.load_config(args.config)
     output = Path(args.output_dir)
-    consumer = FeedConsumer(config, output, args.run_id, args.window_start_utc, args.window_end_utc)
+    try:
+        config = rules.load_config(args.config)
+        consumer = FeedConsumer(config, output, args.run_id, args.window_start_utc, args.window_end_utc)
+    except BaseException as error:
+        # Paths have not necessarily passed validation: do not write to them.
+        print(json.dumps({'status': 'failed', 'phase': 'initializing', 'error': safe_exception(error)}), file=sys.stderr)
+        return 4
     stream_path = Path(args.stream)
     stream = None
     pending = b''
     reason = None
     try:
+        consumer.write_status(force=True)
         while not consumer.ended:
             now = datetime.now(UTC)
             if stream is None:
@@ -383,6 +547,7 @@ def main():
                     stream = stream_path.open('rb')
                 else:
                     consumer.check(now=now)
+                    consumer.write_status(now=now)
                     time.sleep(.02)
                     continue
             # Consume one finite already-written prefix before liveness checks;
@@ -393,6 +558,7 @@ def main():
             chunk = stream.read(available)
             if not chunk:
                 consumer.check(now=now)
+                consumer.write_status(now=now)
                 time.sleep(.02)
                 continue
             pending += chunk
@@ -419,16 +585,32 @@ def main():
                 raise ValueError('wire_partial_line_size_exceeded')
             if not consumer.ended:
                 consumer.check(now=datetime.now(UTC))
+                consumer.write_status()
     except BaseException as exc:
-        # Only local fixed error names are exposed; never serialize raw input.
-        reason = str(exc) if type(exc) is ValueError and str(exc).startswith(('wire_', 'consumer_')) else type(exc).__name__
+        consumer.record_error(exc)
+        reason = consumer.last_error['code']
     finally:
         if stream is not None:
             stream.close()
+    try:
+        consumer.write_status(force=True)
+    except BaseException as error:
+        consumer.record_error(error)
+        reason = consumer.last_error['code']
     result = consumer.summary(reason)
-    with (output / 'summary.json').open('x', encoding='utf-8') as out:
-        json.dump(result, out, indent=2)
-        out.write('\n')
+    try:
+        with (output / 'summary.json').open('x', encoding='utf-8') as out:
+            json.dump(result, out, indent=2)
+            out.write('\n')
+    except BaseException as error:
+        consumer.record_error(ValueError('consumer_summary_write_failed'), during='summary_write')
+        try:
+            consumer.write_status(force=True)
+        except BaseException:
+            pass  # Safe stderr plus nonzero exit remains authoritative.
+        print(json.dumps({'status': 'failed', 'last_error': consumer.last_error,
+            'summary_write_error': safe_exception(error)}), file=sys.stderr)
+        return 4
     return 0 if result['bounded_pipeline_observed'] else 4
 
 

@@ -1,5 +1,9 @@
 # 当前架构
 
+## 当前修复：看护独立启动与真实消费状态
+
+用户授权今晚修复并直接盘中复验。已确认旧测试先发生本地控制管道关闭，持续收流在此前仍正常；具体中断触发者未知。旧case022按独立退出证据受控收尾，原认证/保护状态不变；消费端已补安全具体原因码和每秒实际进度。精确宿主退出交接已通过真实Windows/WSL无SDK实验与独审；116项离线检查通过，case023已登记23:15至次日00:00:05实测。尚未取得真实窗口通过。保持单连接、无重试及无账户订单。 见[盘中修复与验证](decisions/20260924-intraday-supervisor-recovery.md)。
+
 ## 当前实现：Windows完整事件出口与WSL原策略消费
 
 Windows唯一官方同步QuoteContext→完整价格/成交量/日线有序NDJSON→WSL消费者→原FiveMinuteBarBuilder、PipelineProbeEvidence及8条策略router。新接口和看护已离线验收并部署case022；消费者不构造Linux SDK或账户。实时Quote按时段和新鲜度隔离，原snapshot与push契约分开；有序水位、严格序号和两端终止证据防止假完整。尚非真实整场或生产恢复。 见[恢复验收与实施](decisions/20260924-system-recovery-acceptance.md)。

@@ -1,0 +1,62 @@
+{
+  "schema": "m15.intraday-supervisor-recovery.preparation.v1",
+  "preflight": {
+    "manifest_sha256": "fc1e34a56e8a94c043830359c184069ebb11b0f6a9113674c3f6ce953aae1384",
+    "linux_and_windows_bindings_verified": true,
+    "consumer_integrity_count": 425,
+    "predecessor_recovery_verified": true,
+    "credential_plan_valid": true,
+    "exact_native_entry_refuses_early_without_consuming": true,
+    "native_controller": {
+      "native_files_verified": true,
+      "end": "2026-09-24T16:00:05+00:00"
+    },
+    "sdk_started": false
+  },
+  "task": {
+    "wake_to_run": true,
+    "disallow_start_on_battery": false,
+    "stop_on_battery": false,
+    "run_only_if_idle": false,
+    "run_only_if_network": false,
+    "multiple_instances": "IgnoreNew",
+    "task_name": "PAT-Official-Intraday-Recovery-20260924-Once",
+    "state": "Ready",
+    "start_boundary": "2026-09-24T23:15:00+08:00",
+    "end_boundary": "2026-09-24T23:16:00",
+    "next_run": "2026-09-24T23:15:00.0000000+08:00",
+    "logon_type": "Interactive",
+    "run_level": "Limited",
+    "restart_count": 0,
+    "start_when_available": false,
+    "execution_time_limit": "PT2M",
+    "delete_expired_after": "P1D",
+    "manifest_sha256": "fc1e34a56e8a94c043830359c184069ebb11b0f6a9113674c3f6ce953aae1384",
+    "action_verified": true,
+    "production_restart": false,
+    "order_enabled": false
+  },
+  "distinct_offline_tests": 116,
+  "real_lifecycle_smoke": {
+    "sdk_connected": false,
+    "native_heartbeats": 152,
+    "seconds_after_wrapper_exit": 30.703,
+    "exitcode": 0
+  },
+  "old_recorded_stream_replay": {
+    "actual_recorded_events_replayed": 117150,
+    "last_successful_sequence": 117150,
+    "trade_count": 234031,
+    "daily_rows": 8820,
+    "silence_after_upstream_close": {
+      "code": "market_data_heartbeat_deadline_exceeded",
+      "error_type": "RuntimeError"
+    },
+    "new_sdk_connections": 0,
+    "replay_is_not_live_acceptance": true
+  },
+  "case023_real_result": "not_observed_yet",
+  "production_restored": false,
+  "orders_enabled": false,
+  "archive": "/home/hgl/project-archives/Price-Action-Trader/20260924-intraday-recovery"
+}
