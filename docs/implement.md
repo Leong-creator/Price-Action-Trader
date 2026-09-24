@@ -1,5 +1,9 @@
 # 当前执行规则
 
+## 本轮实施：完整行情与原策略只读接通
+
+已部署经独审的case022固定22:15至次日04:00:05单连接窗口，Windows官方接收、WSL原聚合与策略、无账户订单。旧/回退及非Intraday Quote保留分类但不更新常规价格或续新鲜时间；未知时段拒绝，Trade和原时限保持。按接收/K线/策略/时间/退出分别验收，盘中窗口不能冒充完整日；旧故障及订单防重状态保持。 见[恢复验收与实施](decisions/20260924-system-recovery-acceptance.md)。
+
 ## 开盘重复Quote与时钟诊断口径更新
 
 只有已见基线相同timestamp的Quote在队列/未来检查后优先归为duplicate，不fresh不续参考静默；不同timestamp超龄Quote、Trade、回退及数值时限保持。clock_preflight失败只保存白名单原因/安全类型，不抄未知异常原文。已核同源Windows动态授时配置生效，但每次启动仍保留原时间质量判断。任务新清单绑定今晚固定窗口，无重试或交易恢复。见[本轮复查](decisions/20260924-preopen-audit.md)。

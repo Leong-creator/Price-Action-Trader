@@ -1,5 +1,9 @@
 # 当前架构
 
+## 当前实现：Windows完整事件出口与WSL原策略消费
+
+Windows唯一官方同步QuoteContext→完整价格/成交量/日线有序NDJSON→WSL消费者→原FiveMinuteBarBuilder、PipelineProbeEvidence及8条策略router。新接口和看护已离线验收并部署case022；消费者不构造Linux SDK或账户。实时Quote按时段和新鲜度隔离，原snapshot与push契约分开；有序水位、严格序号和两端终止证据防止假完整。尚非真实整场或生产恢复。 见[恢复验收与实施](decisions/20260924-system-recovery-acceptance.md)。
+
 ## 开盘前监控边界补修
 
 接收分类新增Quote重复时间优先分支（在队列/未来检查后），把最后成交时间不变与真实新行情进展区分；Trade原路径不变。看护外壳的时钟失败明确阶段/固定原因码，诊断不包含敏感原始异常。系统授时已从固定0x9改为同源动态0x8，属主机配置；不改SDK或行情源。外层guardian重复UTC截止检查的冗余缺口列为后续加固，现有内层/摘要期限保持。见[本轮复查](decisions/20260924-preopen-audit.md)。

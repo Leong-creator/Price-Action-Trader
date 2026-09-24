@@ -1,0 +1,81 @@
+{
+  "schema": "m15.windows-strategy-bridge.preparation.v1",
+  "market_date": "2026-09-24",
+  "status": "scheduled_not_live_accepted",
+  "task": {
+    "wake_to_run": true,
+    "disallow_start_on_battery": false,
+    "stop_on_battery": false,
+    "run_only_if_idle": false,
+    "run_only_if_network": false,
+    "multiple_instances": "IgnoreNew",
+    "task_name": "PAT-Official-Strategy-Bridge-20260924-Once",
+    "state": "Ready",
+    "start_boundary": "2026-09-24T22:15:00+08:00",
+    "end_boundary": "2026-09-24T22:16:00",
+    "next_run": "2026-09-24T22:15:00.0000000+08:00",
+    "logon_type": "Interactive",
+    "run_level": "Limited",
+    "restart_count": 0,
+    "start_when_available": false,
+    "execution_time_limit": "PT5H50M",
+    "delete_expired_after": "P1D",
+    "manifest_sha256": "a5885fe4538b7ad5782e7a753a3b0bb14328e73773cea904f873de1b5bd0fec2",
+    "action_verified": true,
+    "production_restart": false,
+    "order_enabled": false
+  },
+  "deployment": {
+    "manifest_sha256": "a5885fe4538b7ad5782e7a753a3b0bb14328e73773cea904f873de1b5bd0fec2",
+    "all_bindings_verified": true,
+    "consumer_integrity_count": 425,
+    "credentials_plan_valid": true,
+    "predecessor_exit_verified": true,
+    "sdk_started": false,
+    "consumer_sha256": "2eba9d8ac565b2776e49d0b8311f67930241306d49b11e0d291c36ab2c31f191",
+    "clock_check_sha256": "fee02f15963b3f2cc9cdad80a74a1eab6c15f98110d12e2f35f205196187ba7b",
+    "window_start_utc": "2026-09-24T14:15:00+00:00",
+    "window_end_utc": "2026-09-24T20:00:05+00:00"
+  },
+  "offline_tests": {
+    "new_wire": 35,
+    "supervisor": 65,
+    "reused_modules": 93,
+    "independent": 10,
+    "clock_sampling": 11,
+    "total_distinct": 214,
+    "real_sdk_connections": 0
+  },
+  "synthetic_scale": {
+    "symbols": 147,
+    "daily_rows": 8820,
+    "boundaries": 68,
+    "classified_bars": 9996,
+    "strategy_boundary_evaluations": 68,
+    "seconds": 31.215,
+    "real_session": false
+  },
+  "case021": {
+    "status": "failed",
+    "local_reason": "event_timestamp_regressed",
+    "symbol": "QQQ.US",
+    "source_timestamp": "2026-09-24T13:20:00+00:00",
+    "session": "Intraday",
+    "exit_verified": true,
+    "credentials_cleaned": true,
+    "protected_states_unchanged": true
+  },
+  "clock_preparation": {
+    "quality_passed": false,
+    "maximum_bound_seconds": 0.5,
+    "observed_bounds_seconds": [
+      0.52190423,
+      0.52662635
+    ],
+    "last_native_success_local": "2026-09-24T21:18:04+08:00"
+  },
+  "archive": "/home/hgl/project-archives/Price-Action-Trader/20260924-strategy-bridge",
+  "full_sessions_passed": 0,
+  "production_restored": false,
+  "orders_enabled": false
+}
