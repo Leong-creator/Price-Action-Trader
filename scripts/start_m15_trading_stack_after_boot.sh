@@ -48,10 +48,12 @@ run_step() {
 
 start_stack() {
   local failed=0
-  run_step "start M15 Longbridge SDK realtime runtime" \
-    "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
-    --daemon \
-    --config config/m15_longbridge_marketdata.production.json || failed=1
+  # Only ask Task Scheduler to invoke the audited native host handoff. Starting
+  # Windows quote children directly under this WSL bootstrap couples lifetimes.
+  # The daily entry reserves one run and constructs no account or order client.
+  run_step "trigger prepared M15 daily feed task" \
+    "$PYTHON_BIN" scripts/run_m15_daily_feed.py launch \
+    --config config/m15_daily_feed.production.json || failed=1
 
   run_step "start M15 background watchdog" \
     "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \
@@ -66,10 +68,9 @@ if ! start_stack; then
   exit 1
 fi
 
-run_step "check M15 Longbridge SDK realtime status" \
-  "$PYTHON_BIN" scripts/run_m15_longbridge_sdk_runtime.py \
-  --status \
-  --config config/m15_longbridge_marketdata.production.json
+run_step "check M15 daily feed status" \
+  "$PYTHON_BIN" scripts/run_m15_daily_feed.py status \
+  --config config/m15_daily_feed.production.json
 
 run_step "check M15 background watchdog status" \
   "$PYTHON_BIN" scripts/run_m15_background_watchdog.py \

@@ -22,6 +22,17 @@ class M15DeploymentGovernanceTest(unittest.TestCase):
             DEFAULT_RUNTIME_FILES,
         )
 
+    def test_daily_entry_and_every_supervisor_module_are_source_bound(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        required = {"scripts/run_m15_daily_feed.py", "scripts/m15_feed_clock.py",
+                    "scripts/m15_windows_feed_producer.py", "scripts/m15_windows_feed_consumer.py",
+                    "scripts/m15_feed_session_acceptance.py", "config/m15_daily_feed.production.json",
+                    "scripts/start_m15_trading_stack_after_boot.sh",
+                    "scripts/m15_background_watchdog_lib.py"}
+        required.update(p.relative_to(root).as_posix()
+                        for p in (root / "scripts/m15_feed_runtime").glob("*.py"))
+        self.assertFalse(required - set(DEFAULT_RUNTIME_FILES))
+
     def test_direct_cli_entrypoint_loads_repository_modules(self) -> None:
         completed = subprocess.run(
             [

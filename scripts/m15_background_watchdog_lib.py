@@ -51,6 +51,7 @@ class BackgroundWatchdogConfig:
     readiness_config_path: Path
     monday_acceptance_config_path: Path
     hard_boundaries: dict[str, bool]
+    daily_feed_config_path: Path = ROOT / "config/m15_daily_feed.production.json"
 
 
 def resolve_repo_path(value: str | Path) -> Path:
@@ -104,6 +105,9 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> BackgroundWatchdogCon
             )
         ),
         hard_boundaries={str(k): bool(v) for k, v in payload.get("hard_boundaries", {}).items()},
+        daily_feed_config_path=resolve_repo_path(
+            inputs.get("daily_feed_config", "config/m15_daily_feed.production.json")
+        ),
     )
     validate_config(config)
     return config
@@ -120,8 +124,8 @@ def validate_config(config: BackgroundWatchdogConfig) -> None:
         raise ValueError("M15 background watchdog analytics refresh interval must be positive")
     if config.analytics_command_timeout_seconds <= 0:
         raise ValueError("M15 background watchdog analytics command timeout must be positive")
-    if config.m15_runtime_engine != "sdk":
-        raise ValueError("M15 background watchdog only observes the SDK runtime")
+    if config.m15_runtime_engine not in {"sdk", "daily_feed"}:
+        raise ValueError("M15 background watchdog runtime engine is unsupported")
     if config.hard_boundaries.get("paper_simulated_only") is not True:
         raise ValueError("M15 background watchdog must stay paper/simulated only")
     for key in ("live_execution", "real_money_actions", "manual_m12_37_once", "margin_financing"):
@@ -139,6 +143,8 @@ def run_background_watchdog_once(
     config.output_dir.mkdir(parents=True, exist_ok=True)
     generated_at = generated_at or now_utc_iso()
     runner = command_runner or run_command
+    if config.m15_runtime_engine == "daily_feed":
+        return run_daily_feed_watchdog_once(config, runner, generated_at)
     previous = read_json(config.output_dir / SUMMARY_JSON)
     analytics_step = analytics_refresh_step(config, runner, generated_at, previous=previous)
     steps = [
@@ -228,6 +234,95 @@ def run_background_watchdog_once(
     if append_ledger:
         append_jsonl(config.output_dir / LEDGER_JSONL, [payload])
     (config.output_dir / REPORT_MD).write_text(render_markdown(payload), encoding="utf-8")
+    return payload
+
+
+def run_daily_feed_watchdog_once(config, runner, generated_at):
+    """Observe the daily feed only: no legacy analytics, account or SDK calls."""
+    command = [sys.executable, "scripts/run_m15_daily_feed.py", "status",
+               "--config", project_path(config.daily_feed_config_path)]
+    assert_safe_watchdog_command(command)
+    feed = {}
+    reason = None
+    try:
+        result = runner(command, config.command_timeout_seconds)
+        if result.returncode != 0:
+            reason = "daily_feed_status_command_failed"
+        else:
+            feed = json.loads(result.stdout)
+            if (not isinstance(feed, dict)
+                    or feed.get("schema_version") != "m15.daily-feed-status.v1"
+                    or not isinstance(feed.get("state"), str)
+                    or feed["state"] not in {"not_prepared", "prepared", "waiting", "starting",
+                                             "streaming", "completed", "failed", "unknown", "non_trading_day"}):
+                reason = "daily_feed_status_invalid"
+                feed = {}
+    except (OSError, subprocess.TimeoutExpired, ValueError, TypeError):
+        reason = "daily_feed_status_unavailable"
+        feed = {}
+    state = feed.get("state", "unknown")
+    waiting = state in {"prepared", "waiting", "non_trading_day"}
+    if reason is None:
+        if state == "streaming":
+            if feed.get("process_alive") is not True or feed.get("data_current") is not True:
+                reason = "daily_feed_current_data_unproven"
+            elif feed.get("clock_quality_passed") is not True:
+                reason = "daily_feed_clock_quality_unproven"
+        elif state == "completed":
+            completion = feed.get("completion")
+            if not isinstance(completion, dict) or completion.get("exit_verified") is not True:
+                reason = "daily_feed_exit_unverified"
+            elif completion.get("credentials_cleaned") is not True:
+                reason = "daily_feed_cleanup_incomplete"
+            elif completion.get("bounded_pipeline_passed") is not True:
+                reason = "daily_feed_window_not_passed"
+            elif feed.get("clock_quality_passed") is not True:
+                reason = "daily_feed_clock_quality_unproven"
+        elif state == "starting":
+            if feed.get("process_alive") is not True:
+                reason = "daily_feed_start_process_unproven"
+        elif not waiting:
+            reason = "daily_feed_" + (state if state in {"failed", "not_prepared"} else "unknown")
+    labels = {"streaming": "行情接收中", "completed": "本次行情窗口已结束",
+              "prepared": "当日任务已准备，等待启动", "waiting": "等待交易时段",
+              "non_trading_day": "非交易日", "starting": "行情正在初始化",
+              "failed": "行情运行故障", "not_prepared": "当日任务尚未准备", "unknown": "当前状态未知"}
+    safe_feed = {key: feed.get(key) for key in (
+        "schema_version", "state", "market_date", "run_id", "process_alive",
+        "data_current", "clock_quality_passed", "last_error", "completion", "acceptance"
+    )}
+    text = labels.get(state, labels["unknown"])
+    if reason:
+        text += "；需检查：" + reason
+    payload = {
+        "schema_version": "m15.background-watchdog.v1", "stage": config.stage,
+        "generated_at": generated_at,
+        "watchdog_status": "needs_attention" if reason else "waiting" if waiting else
+                           "completed" if state == "completed" else "initializing" if state == "starting" else "healthy",
+        "step_count": 1, "failed_step_count": int(reason is not None),
+        "waiting_step_count": int(waiting and reason is None),
+        "steps": [{"step_id": "m15_daily_feed_status", "label": "日常行情与策略观察",
+                   "returncode": 3 if reason else 0, "expected_wait": waiting,
+                   "elapsed_ms": None, "command": printable_command(command),
+                   "stdout_tail": text, "stderr_tail": reason or ""}],
+        "daily_feed": safe_feed, "plain_language_result": text,
+        "next_check_interval_seconds": config.check_interval_seconds,
+        "paper_simulated_only": True, "live_execution": False, "real_money_actions": False,
+        "account_access": False, "order_access": False, "automatic_restart": False,
+        "refs": {"m15_runtime_engine": "daily_feed", "daily_feed_config": project_path(config.daily_feed_config_path)},
+    }
+    previous = read_json(config.output_dir / SUMMARY_JSON)
+    append_ledger = should_append_watchdog_ledger(previous, payload)
+    payload["last_ledger_at"] = generated_at if append_ledger else str(previous.get("last_ledger_at") or "")
+    write_json(config.output_dir / SUMMARY_JSON, payload)
+    if append_ledger:
+        append_jsonl(config.output_dir / LEDGER_JSONL, [payload])
+    (config.output_dir / REPORT_MD).write_text(
+        "# 当前日常行情状态\n\n" + text + "\n\n"
+        + f"交易日：{feed.get('market_date') or '未知'}；运行编号：{feed.get('run_id') or '无'}。\n\n"
+        + "本报告仅观察当前行情与原策略；不读取旧账户产物，不重启行情，不提交订单。\n",
+        encoding="utf-8",
+    )
     return payload
 
 
@@ -388,6 +483,7 @@ def assert_safe_watchdog_command(command: list[str]) -> None:
     if any(token in joined for token in forbidden):
         raise ValueError(f"unsafe watchdog command blocked: {joined}")
     allowed_scripts = {
+        "scripts/run_m15_daily_feed.py",
         "scripts/run_m15_longbridge_realtime_account_state.py",
         "scripts/run_m15_opening_trade_readiness.py",
         "scripts/run_m15_longbridge_sdk_runtime.py",
@@ -399,6 +495,10 @@ def assert_safe_watchdog_command(command: list[str]) -> None:
     script_tokens = [token for token in command if token.startswith("scripts/")]
     if not script_tokens or script_tokens[0] not in allowed_scripts:
         raise ValueError(f"watchdog command is not allowed: {joined}")
+    if script_tokens[0] == "scripts/run_m15_daily_feed.py":
+        index = command.index(script_tokens[0])
+        if command[index + 1:index + 3] != ["status", "--config"] or len(command[index:]) != 4:
+            raise ValueError("daily feed watchdog permits only the status command")
 
 
 def printable_command(command: list[str]) -> str:

@@ -1,0 +1,24 @@
+{
+  "schema_version": "m15.daily-feed.v1",
+  "production_config": "config/m15_longbridge_marketdata.production.json",
+  "sessions_root": "/home/hgl/project-archives/Price-Action-Trader/daily-feed-sessions",
+  "windows_environment_receipt": "/home/hgl/project-archives/Price-Action-Trader/20260925-daily-feed/windows-environment-receipt.json",
+  "windows_environment_receipt_sha256": "fa1be3b06873543f4d91b313c10e7dece74c4ea32ad75d5bbff650b724080659",
+  "credential_transfer_plan": "/home/hgl/project-archives/Price-Action-Trader/20260925-daily-feed/credential-transfer.private.json",
+  "additional_windows_fences": [
+    "/mnt/c/Users/hegua/AppData/Local/Temp/pat-official-isolated-20260920/windows-case-active.json"
+  ],
+  "source_home": "/home/hgl",
+  "distribution": "Ubuntu",
+  "user": "hgl",
+  "launch_lead_minutes": 15,
+  "latest_start_slack_seconds": 60,
+  "calendar_years": [2026],
+  "early_close_dates": ["2026-11-27", "2026-12-24"],
+  "task_name_prefix": "PAT-M15-Daily-Feed",
+  "deployment_manifest": "reports/runtime/m15_daily_feed_deployment_manifest.json",
+  "account_access": false,
+  "order_access": false,
+  "automatic_retry": false,
+  "automatic_source_fallback": false
+}

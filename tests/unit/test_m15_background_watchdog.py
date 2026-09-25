@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.m15_background_watchdog_lib import (
+    assert_safe_watchdog_command,
     acceptance_is_expected_readonly_wait,
     analytics_refresh_due,
     load_config,
@@ -22,6 +23,70 @@ from scripts.m15_background_watchdog_lib import (
 
 
 class M15BackgroundWatchdogTest(unittest.TestCase):
+    def test_daily_feed_observation_never_calls_account_or_legacy_analytics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="daily_feed")
+            calls = []
+            def runner(command, timeout):
+                calls.append(command)
+                return type("Result", (), {"returncode": 0, "stdout": json.dumps({
+                    "schema_version": "m15.daily-feed-status.v1", "state": "streaming",
+                    "market_date": "2026-09-25", "run_id": "test",
+                    "process_alive": True, "data_current": True, "clock_quality_passed": True,
+                })})()
+            result = run_background_watchdog_once(config, command_runner=runner)
+            self.assertEqual(result["watchdog_status"], "healthy")
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls[0][1:3], ["scripts/run_m15_daily_feed.py", "status"])
+            self.assertFalse(result["account_access"])
+            self.assertFalse(result["order_access"])
+
+    def test_daily_feed_unknown_clock_and_stale_stream_do_not_show_healthy(self):
+        for data_current, clock in ((True, None), (False, True), (True, False)):
+            with self.subTest(data_current=data_current, clock=clock), tempfile.TemporaryDirectory() as tmp:
+                config = self.make_config(Path(tmp), runtime_engine="daily_feed")
+                feed = {"schema_version": "m15.daily-feed-status.v1", "state": "streaming",
+                        "process_alive": True, "data_current": data_current, "clock_quality_passed": clock}
+                result = run_background_watchdog_once(config, command_runner=lambda *_: type(
+                    "Result", (), {"returncode": 0, "stdout": json.dumps(feed)})())
+                self.assertEqual(result["watchdog_status"], "needs_attention")
+
+    def test_daily_feed_completion_requires_exit_cleanup_and_clock(self):
+        for cleanup in (False, True):
+            with self.subTest(cleanup=cleanup), tempfile.TemporaryDirectory() as tmp:
+                config = self.make_config(Path(tmp), runtime_engine="daily_feed")
+                feed = {"schema_version": "m15.daily-feed-status.v1", "state": "completed",
+                        "clock_quality_passed": True,
+                        "completion": {"exit_verified": True, "credentials_cleaned": cleanup,
+                                       "bounded_pipeline_passed": True}}
+                result = run_background_watchdog_once(config, command_runner=lambda *_: type(
+                    "Result", (), {"returncode": 0, "stdout": json.dumps(feed)})())
+                self.assertEqual(result["watchdog_status"], "completed" if cleanup else "needs_attention")
+
+    def test_daily_feed_invalid_json_is_unknown_not_healthy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="daily_feed")
+            result = run_background_watchdog_once(config, command_runner=lambda *_: type(
+                "Result", (), {"returncode": 0, "stdout": "not-json"})())
+            self.assertEqual(result["watchdog_status"], "needs_attention")
+            self.assertEqual(result["daily_feed"]["state"], None)
+
+    def test_watchdog_daily_command_cannot_launch_or_prepare(self):
+        for action in ("launch", "prepare", "status --launch"):
+            with self.assertRaises(ValueError):
+                assert_safe_watchdog_command(["python", "scripts/run_m15_daily_feed.py", action,
+                                              "--config", "config/m15_daily_feed.production.json"])
+
+    def test_daily_feed_malformed_state_cannot_crash_watchdog(self):
+        for state in ([], {}, None, 1, "unexpected"):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as tmp:
+                config = self.make_config(Path(tmp), runtime_engine="daily_feed")
+                feed = {"schema_version": "m15.daily-feed-status.v1", "state": state}
+                result = run_background_watchdog_once(config, command_runner=lambda *_: type(
+                    "Result", (), {"returncode": 0, "stdout": json.dumps(feed)})())
+                self.assertEqual(result["watchdog_status"], "needs_attention")
+                self.assertEqual(result["steps"][0]["stderr_tail"], "daily_feed_status_invalid")
+
     def test_readonly_gate_wait_is_not_a_watchdog_failure(self) -> None:
         payload = {
             "acceptance_status": "blocked_monday_acceptance",
