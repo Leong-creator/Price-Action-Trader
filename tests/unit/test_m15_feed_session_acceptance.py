@@ -9,6 +9,21 @@ from scripts import m15_feed_session_acceptance as a
 
 
 class SessionAcceptanceTests(unittest.TestCase):
+    def test_diagnostic_scope_explicitly_cannot_acquire_full_session_qualification(self):
+        from unittest.mock import patch
+        for scope in ({'session_kind': 'intraday_diagnostic'},
+                      {'session_kind': 'unknown'},
+                      {'full_session_eligible': False},
+                      {'diagnostic_capture_after_quality_fault': True}):
+            with self.subTest(scope=scope), patch.object(a, 'read_json') as reader:
+                result = a.evaluate_session('/unused', {'run_id': 'diagnostic', **scope},
+                    {}, {}, session_spec_sha256='bound')
+                self.assertFalse(result['normal_full_session_observation_passed'])
+                self.assertFalse(result['trading_enabled'])
+                self.assertEqual(result['failures'],
+                    ['diagnostic_or_unknown_scope_not_full_session_eligible'])
+                reader.assert_not_called()
+
     def test_missing_evidence_cannot_pass_or_grant_accounts(self):
         with tempfile.TemporaryDirectory() as directory:
             result = a.evaluate_session(directory, {'run_id': 'test'}, {}, {}, session_spec_sha256='test')

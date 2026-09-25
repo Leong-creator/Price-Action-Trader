@@ -49,7 +49,8 @@ wire_abnormal_end wire_premature_or_incomplete_end wire_producer_reported_error 
 consumer_clock_discontinuity consumer_status_write_failed consumer_summary_write_failed consumer_evidence_write_failed
 wire_end_deadline_exceeded wire_stream_symlink wire_reader_backlog_or_truncation
 wire_line_size_exceeded wire_watermark_in_future wire_trailing_content_after_end wire_partial_line_size_exceeded
-wire_nonfinite_json
+wire_nonfinite_json diagnostic_reference_market_data_stalled diagnostic_wire_progress_stalled
+wire_stage_after_quality_fault
 diagnostic_daily_context_not_current_or_complete diagnostic_stale_strategy_bar
 quote_worker_reported_failure bars_before_ready duplicate_boundary
 market_data_heartbeat_deadline_exceeded reference_market_data_stalled diagnostic_clock_discontinuity
@@ -182,7 +183,7 @@ class LatencyHistogram:
 
 
 class FeedConsumer:
-    def __init__(self, config, output, run_id, start, end, *, now=None):
+    def __init__(self, config, output, run_id, start, end, *, now=None, diagnostic_capture_after_quality_fault=False):
         self.start, self.end = stamp(start), stamp(end)
         now = stamp(now or datetime.now(UTC))
         if str(UUID(run_id)) != run_id or not self.start < self.end:
@@ -225,6 +226,94 @@ class FeedConsumer:
             'bar_oldest_callback_to_judgment', 'bar_latest_callback_to_judgment', 'router_duration')}
         self.bucket_receipts = {}
         self.persisted_bar_count = 0
+        self.diagnostic_capture_after_quality_fault = diagnostic_capture_after_quality_fault
+        self.first_quality_fault = None
+        self.diagnostic_raw_counts = Counter()
+        self.diagnostic_reference_progress = {}
+        self.diagnostic_trade_label_age_max_ms = None
+
+    def _diagnostic_activity(self, kind, symbol, event, received, *, advance=True):
+        """Separate raw source progress from usable strategy data; never feeds builder."""
+        events = [event] if kind == 'quote' else event['trades']
+        for item in events:
+            if item['timestamp'] > received + timedelta(seconds=2):
+                raise ValueError('wire_quote_timestamp_in_future' if kind == 'quote' else 'trade_timestamp_in_future')
+            session = item.get('trade_session')
+            if not isinstance(session, str) or session not in ('Intraday', 'TradeSession.Intraday',
+                    'Pre', 'TradeSession.Pre', 'Post', 'TradeSession.Post', 'Overnight', 'TradeSession.Overnight'):
+                raise ValueError('wire_quote_session_invalid' if kind == 'quote' else 'wire_trade_classification_required')
+            if not advance:
+                continue
+            if kind == 'trade' and self.first_quality_fault is not None:
+                age = (received-item['timestamp']).total_seconds()*1000
+                self.diagnostic_trade_label_age_max_ms = (age if self.diagnostic_trade_label_age_max_ms is None
+                    else max(self.diagnostic_trade_label_age_max_ms, age))
+            if symbol not in ('SPY.US', 'QQQ.US') or session.split('.')[-1] != 'Intraday':
+                continue
+            if kind == 'trade' and item['trade_type'] not in {'', 'A', 'B', 'D', 'E', 'F', 'K', 'S', 'X', '1', 'C', 'G', 'H', 'I', 'V', 'W'}:
+                continue
+            key = symbol + ':' + kind
+            previous = self.diagnostic_reference_progress.get(key)
+            if previous is None or item['timestamp'] > previous['source_event_at']:
+                last = previous['received_at'] if previous else self.ready_at
+                if self.first_quality_fault is not None and last is not None and received-last > timedelta(seconds=30):
+                    raise ValueError('diagnostic_reference_market_data_stalled')
+                self.diagnostic_reference_progress[key] = {'source_event_at': item['timestamp'],
+                    'received_at': received, 'wire_sequence': self.sequence}
+
+    def _latch_trade_quality_fault(self, symbol, event, received, now):
+        # Identify the first execution which can reach the original source-age
+        # guard. The original on_trade may already have appended earlier items;
+        # freeze that state and never replay this batch or finish those bars.
+        candidates = []
+        for item in event['trades']:
+            source = item['timestamp']
+            opened = rules.floor_bar_open(source, self.config.bar_minutes)
+            local = source.astimezone(rules.NEW_YORK)
+            if (item['price'] > 0 and item['trade_session'].split('.')[-1].lower() == 'intraday'
+                    and item['trade_type'] in {'', 'A', 'B', 'D', 'E', 'F', 'K', 'S', 'X', '1', 'C', 'G', 'H', 'I', 'V', 'W'}
+                    and local.weekday() < 5 and local.date().isoformat() not in self.config.market_holidays
+                    and (local.hour > 9 or local.hour == 9 and local.minute >= 30) and local.hour < 16
+                    and (self.builder.complete_bar_open_not_before is None or opened >= self.builder.complete_bar_open_not_before)
+                    and received-source > timedelta(milliseconds=self.config.maximum_source_delivery_age_ms)):
+                candidates.append(item)
+        if not candidates:
+            raise ValueError('trade_source_delivery_age_exceeded')
+        item = candidates[0]
+        self.first_quality_fault = {'code': 'trade_source_delivery_age_exceeded',
+            'run_id': self.run_id, 'wire_sequence': self.sequence, 'symbol': symbol,
+            'source_event_at': item['timestamp'].isoformat(), 'received_at': received.isoformat(),
+            'dequeued_at': now.isoformat(), 'source_label_age_ms': (received-item['timestamp']).total_seconds()*1000,
+            'source_timestamp_gap_ms': (received-item['timestamp']).total_seconds()*1000,
+            'timestamp_precision_seconds': 1, 'local_clock_offset_applied': False, 'age_basis': 'integer_second_source_label_not_exact_execution_latency',
+            'trade_type': item['trade_type'], 'trade_session': item['trade_session'],
+            'strategy_evaluations_frozen_at': self.evidence.strategy.evaluations,
+            'completed_boundaries_frozen_at': self.evidence.session.complete_boundary_count,
+            'partial_builder_state_frozen': True, 'strategy_resume_allowed': False}
+        self.diagnostic_trade_label_age_max_ms = self.first_quality_fault['source_label_age_ms']
+        self._append_evidence('quality-faults.jsonl', [self.first_quality_fault])
+
+    def _check_diagnostic_progress(self, now):
+        if self.last_processed_at is None or now-self.last_processed_at > timedelta(
+                seconds=self.config.market_data_heartbeat_deadline_seconds):
+            raise ValueError('diagnostic_wire_progress_stalled')
+        for symbol in ('SPY.US', 'QQQ.US'):
+            for kind in ('quote', 'trade'):
+                progress = self.diagnostic_reference_progress.get(symbol + ':' + kind)
+                last = progress['received_at'] if progress else self.ready_at
+                if last is None or now-last > timedelta(seconds=30):
+                    raise ValueError('diagnostic_reference_market_data_stalled')
+
+    def _diagnostic_state(self):
+        return {'diagnostic_capture_after_quality_fault': self.diagnostic_capture_after_quality_fault,
+            'first_quality_fault': self.first_quality_fault,
+            'strategy_frozen': self.first_quality_fault is not None,
+            'quality_passed': False if self.first_quality_fault else None,
+            'diagnostic_raw_counts_after_fault': dict(self.diagnostic_raw_counts),
+            'diagnostic_trade_source_timestamp_gap_max_ms': self.diagnostic_trade_label_age_max_ms,
+            'diagnostic_reference_progress': {key: {name: value.isoformat() if isinstance(value, datetime) else value
+                for name, value in row.items()} for key, row in self.diagnostic_reference_progress.items()},
+            'diagnostic_progress_basis': 'source_timestamp_advancement_not_strategy_quality'}
 
     def _append_evidence(self, filename, rows):
         try:
@@ -316,6 +405,10 @@ class FeedConsumer:
         self.last_consumed_sequence = self.sequence
         self.last_processed_at = now
         kind, payload = row['kind'], row['payload']
+        if self.first_quality_fault is not None:
+            self.diagnostic_raw_counts[kind] += 1
+            if kind == 'trade':
+                self.diagnostic_raw_counts['trade_executions'] += len(payload['event']['trades'])
         if kind == 'watermark':
             self.last_consumed_watermark = self.watermark
         if kind in ('quote', 'trade') and now <= self.end:
@@ -360,6 +453,8 @@ class FeedConsumer:
         self.sequence, self.emitted = seq, emitted
         self.counts[kind] += 1
         if kind == 'stage':
+            if self.first_quality_fault is not None:
+                raise ValueError('wire_stage_after_quality_fault')
             # Windows monotonic values have an unrelated origin. Only the first
             # local receipt advances the existing absolute phase deadline.
             phase = payload['phase']
@@ -432,6 +527,8 @@ class FeedConsumer:
                 if now - received > timedelta(milliseconds=self.config.maximum_source_delivery_age_ms):
                     raise ValueError('wire_processing_backlog')
                 event = restore_event(payload['event'], kind)
+                if self.diagnostic_capture_after_quality_fault:
+                    self._diagnostic_activity(kind, symbol, event, received, advance=False)
                 # Tail data is excluded from observation and cannot repair a
                 # missing boundary. A late trade for an already eligible bucket
                 # would make its sealed bar untrustworthy, so it still fails.
@@ -446,6 +543,12 @@ class FeedConsumer:
             if self.watermark is not None and received <= self.watermark:
                 raise ValueError('wire_event_behind_watermark')
             event = restore_event(payload['event'], kind)
+            if self.diagnostic_capture_after_quality_fault:
+                self._diagnostic_activity(kind, symbol, event, received)
+            if self.first_quality_fault is not None:
+                if kind == 'trade':
+                    self.trade_count += len(event['trades'])
+                return
             if kind == 'quote':
                 if event['timestamp'] > received + timedelta(seconds=2):
                     raise ValueError('wire_quote_timestamp_in_future')
@@ -483,8 +586,14 @@ class FeedConsumer:
             else:
                 # Every real trade is retained: equal timestamps are NOT IDs.
                 self.trade_count += len(event['trades'])
-                self.builder.on_trade(symbol, event, received_at=received,
-                    maximum_source_delivery_age_ms=self.config.maximum_source_delivery_age_ms, processed_at=now)
+                try:
+                    self.builder.on_trade(symbol, event, received_at=received,
+                        maximum_source_delivery_age_ms=self.config.maximum_source_delivery_age_ms, processed_at=now)
+                except ValueError as error:
+                    if not self.diagnostic_capture_after_quality_fault or str(error) != 'trade_source_delivery_age_exceeded':
+                        raise
+                    self._latch_trade_quality_fault(symbol, event, received, now)
+                    return
                 for trade in event['trades']:
                     opened = rules.floor_bar_open(trade['timestamp'], self.config.bar_minutes)
                     key = (symbol, opened)
@@ -514,7 +623,7 @@ class FeedConsumer:
                     raise ValueError('wire_heartbeat_before_ready')
                 # Progress is observable, but does not reset phase.started.
                 return
-            if not tail:
+            if not tail and self.first_quality_fault is None:
                 self._emit({'kind': 'heartbeat'}, now)
             if kind == 'watermark':
                 through = stamp(payload['received_through'])
@@ -523,7 +632,7 @@ class FeedConsumer:
                 if self.watermark is not None and through < self.watermark:
                     raise ValueError('wire_watermark_regressed')
                 self.watermark = through
-                if tail or through == self.end:
+                if tail or through == self.end or self.first_quality_fault is not None:
                     return  # Terminal prefix evidence never seals a bar.
                 bars = self.builder.complete_boundary(self.symbols, through)
                 if bars:
@@ -534,6 +643,10 @@ class FeedConsumer:
             through = stamp(payload['received_through'])
             if through != self.end or now < self.end or emitted < self.end:
                 raise ValueError('wire_premature_or_incomplete_end')
+            if self.first_quality_fault is not None:
+                self._check(now=now)
+                if self.watermark != self.end:
+                    raise ValueError('wire_premature_or_incomplete_end')
             # End is evidence only: never fabricate a final bar after cutoff.
             self.ended = True
             self.end_sequence = seq
@@ -556,7 +669,9 @@ class FeedConsumer:
             raise ValueError('consumer_clock_discontinuity')
         if now > self.end + timedelta(seconds=5):
             raise ValueError('wire_end_deadline_exceeded')
-        if now <= self.end:
+        if self.first_quality_fault is not None:
+            self._check_diagnostic_progress(min(now, self.end))
+        elif now <= self.end:
             self.evidence.check_deadlines(now)
 
     def live_status(self, *, now=None):
@@ -575,7 +690,10 @@ class FeedConsumer:
         session = self.evidence.session
         return {'schema_version': 1, 'run_id': self.run_id,
             'observed_at': stamp(now or datetime.now(UTC)).isoformat(),
-            'status': ('failed' if self.last_error else 'finished' if self.ended else
+            'status': ('failed' if self.last_error else
+                       'diagnostic_capture_complete' if self.ended and self.first_quality_fault else
+                       'finished' if self.ended else
+                       'diagnostic_capture_quality_failed' if self.first_quality_fault else
                        'observing' if self.ready else 'initializing'),
             'phase': self.evidence.stage_deadline.phase,
             'last_consumed_sequence': self.last_consumed_sequence,
@@ -593,7 +711,7 @@ class FeedConsumer:
             'complete_boundary_count': session.complete_boundary_count if session else 0,
             'bar_count': self.evidence.bar_count,
             'strategy_evaluation_count': self.evidence.strategy.evaluations,
-            'producer_end_observed': self.ended, 'last_error': self.last_error,
+            'producer_end_observed': self.ended, 'last_error': self.last_error, **self._diagnostic_state(),
             'production_acceptance': False, 'full_session_acceptance': False}
 
     def write_status(self, *, now=None, force=False):
@@ -629,11 +747,14 @@ class FeedConsumer:
             if session else [])
         all_boundaries = bool(eligible and set(eligible) == session.boundaries)
         traded = session.realtime_tradable_bar_count if session else 0
-        passed = bool(reason is None and self.ended and all_boundaries and traded > 0
+        passed = bool(self.first_quality_fault is None and reason is None and self.ended and all_boundaries and traded > 0
                       and self.trade_count > 0 and strategy['strategy_input_coverage_observed']
                       and strategy['strategy_evaluation_count'] > 0)
+        capture_complete = bool(self.first_quality_fault is not None and reason is None and self.ended
+            and self.watermark == self.end and len(self.diagnostic_reference_progress) == 4)
         return {'schema_version': 1, 'run_id': self.run_id,
-            'status': 'window_observed' if passed else ('failed' if reason else 'incomplete'),
+            'status': 'diagnostic_capture_complete' if capture_complete else 'window_observed' if passed else ('failed' if reason else 'incomplete'),
+            'diagnostic_capture_complete': capture_complete, **self._diagnostic_state(),
             'reason': reason, 'producer_end_observed': self.ended, 'bounded_pipeline_observed': passed,
             'complete_boundary_count': boundaries, 'bar_count': self.evidence.bar_count,
             'window_start_utc': self.start.isoformat(), 'window_end_utc': self.end.isoformat(),
@@ -659,11 +780,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('stream', 'config', 'output-dir', 'run-id', 'window-start-utc', 'window-end-utc'):
         parser.add_argument('--' + name, required=True)
+    parser.add_argument('--diagnostic-capture-after-quality-fault', action='store_true',
+        help='Only for a separately authorized intraday diagnostic; freezes strategy on source-age failure and retains raw capture.')
     args = parser.parse_args()
     output = Path(args.output_dir)
     try:
         config = rules.load_config(args.config)
-        consumer = FeedConsumer(config, output, args.run_id, args.window_start_utc, args.window_end_utc)
+        consumer = FeedConsumer(config, output, args.run_id, args.window_start_utc, args.window_end_utc,
+            diagnostic_capture_after_quality_fault=args.diagnostic_capture_after_quality_fault)
     except BaseException as error:
         # Paths have not necessarily passed validation: do not write to them.
         print(json.dumps({'status': 'failed', 'phase': 'initializing', 'error': safe_exception(error)}), file=sys.stderr)
@@ -747,7 +871,7 @@ def main():
         print(json.dumps({'status': 'failed', 'last_error': consumer.last_error,
             'summary_write_error': safe_exception(error)}), file=sys.stderr)
         return 4
-    return 0 if result['bounded_pipeline_observed'] else 4
+    return 5 if result.get('diagnostic_capture_complete') is True else 0 if result['bounded_pipeline_observed'] else 4
 
 
 if __name__ == '__main__':

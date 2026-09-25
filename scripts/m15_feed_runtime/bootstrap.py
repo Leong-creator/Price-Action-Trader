@@ -39,7 +39,11 @@ def validate(manifest):
     require(manifest.get('schema') == SCHEMA, 'manifest_schema_invalid')
     day=manifest['market_date']
     require(re.fullmatch(r'\d{4}-\d{2}-\d{2}',day) is not None, 'market_date_invalid')
-    require(manifest['case']=='daily-'+day, 'daily_case_identity_invalid')
+    kind=manifest.get('session_kind','daily')
+    require(kind in {'daily','intraday_diagnostic'}, 'session_kind_invalid')
+    capture=manifest.get('diagnostic_capture_after_quality_fault',False)
+    require(type(capture) is bool and (not capture or kind=='intraday_diagnostic'),
+            'diagnostic_capture_scope_invalid')
     require(re.fullmatch(r'[0-9a-f-]{36}',manifest['run_nonce']) is not None, 'run_nonce_invalid')
     start,latest,end=[utc(manifest[k]) for k in ('window_start_utc','latest_start_utc','window_end_utc')]
     opening,closing=[utc(manifest[k]) for k in ('regular_open_utc','regular_close_utc')]
@@ -50,11 +54,24 @@ def validate(manifest):
     require(int(day[:4]) in manifest['calendar']['supported_years'], 'calendar_year_not_verified')
     require(opening.hour in (13,14) and opening.minute==30 and opening.second==0
             and closing-opening==timedelta(hours=6,minutes=30), 'normal_session_hours_invalid')
-    require(start==opening-timedelta(minutes=15) and latest==start+timedelta(seconds=60)
-            and end==closing+timedelta(seconds=5), 'daily_window_invalid')
+    if kind=='daily':
+        require(manifest['case']=='daily-'+day, 'daily_case_identity_invalid')
+        require(start==opening-timedelta(minutes=15) and latest==start+timedelta(seconds=60)
+                and end==closing+timedelta(seconds=5), 'daily_window_invalid')
+        session_key=day
+    else:
+        require(start.microsecond==end.microsecond==0, 'intraday_whole_seconds_required')
+        require(opening<=start<latest<end<=closing+timedelta(seconds=5)
+                and latest==start+timedelta(seconds=60)
+                and end-start<=timedelta(minutes=60), 'intraday_window_invalid')
+        suffix=start.strftime('%H%M%S')
+        session_key=day+'-intraday-'+suffix
+        require(manifest.get('session_key')==session_key
+                and manifest['case']=='intraday-'+day+'-'+suffix, 'intraday_identity_invalid')
+        require(manifest.get('full_session_eligible') is False, 'intraday_must_remain_partial')
     layout=manifest['layout']
     archive=Path(layout['archive'])
-    require(archive.name==day and archive.parent==Path(layout['sessions_root']), 'session_directory_invalid')
+    require(archive.name==session_key and archive.parent==Path(layout['sessions_root']), 'session_directory_invalid')
     require(not archive.is_relative_to(Path(layout['repo_root'])), 'session_must_be_outside_repository')
     require(Path(layout['transfer'])==archive/'credential-transfer.private.json', 'transfer_path_invalid')
     require(Path(manifest['consumer']['output_dir'])==archive/'consumer-output', 'consumer_output_invalid')

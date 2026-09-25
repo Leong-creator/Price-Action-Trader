@@ -54,6 +54,13 @@ def evaluate_session(consumer_dir, session_spec, completion, clock_evidence, *, 
         'account_access': False, 'order_access': False, 'trading_enabled': False,
         'clock_scope': 'fixed_checkpoint_samples_not_continuous_utc_proof',
         'layers': {}, 'evidence_sha256': {}}
+    # A diagnostic window cannot acquire whole-day qualification even if its
+    # other artifacts are accidentally copied from a successful full session.
+    if (spec.get('session_kind', 'daily') != 'daily'
+            or spec.get('full_session_eligible', True) is not True
+            or spec.get('diagnostic_capture_after_quality_fault', False) is not False):
+        result['failures'] = ['diagnostic_or_unknown_scope_not_full_session_eligible']
+        return result
     failures = []
     def require(condition, code):
         if not condition:

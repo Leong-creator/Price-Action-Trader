@@ -346,6 +346,26 @@ def diagnostic_passed(manifest, layout):
         return False
 
 
+def diagnostic_capture_completed(manifest,layout,safe):
+    """Cross-check both terminal sequences without granting quality acceptance."""
+    try:
+        bridge=load_module(layout.archive/'bridge_lifecycle.py','verified_capture_completion')
+        if (safe.get('diagnostic_capture_completed') is not True or safe.get('exit_verified') is not True
+                or safe.get('child_exitcode')!=0 or safe.get('job_active_processes')!=0
+                or not bridge.diagnostic_capture_completed(manifest,safe.get('consumer_exitcode'))):
+            return False
+        producer=json.loads(read_regular(layout.windows_root/CASE/'summary.json'))
+        consumer=json.loads(read_regular(Path(manifest['consumer']['output_dir'])/'summary.json'))
+        return (producer.get('schema_version')==1 and producer.get('run_id')==manifest['run_nonce']
+            and producer.get('status')=='window_observed' and producer.get('completed_window') is True
+            and 'reason' in producer and producer['reason'] is None
+            and producer.get('production_acceptance') is False
+            and all(stamp(producer[k])==stamp(manifest[k]) for k in ('window_start_utc','window_end_utc'))
+            and producer.get('terminal_sequence')==consumer['producer_end_sequence'])
+    except (OSError,ValueError,KeyError,TypeError,AttributeError,RuntimeError):
+        return False
+
+
 def _diagnostic_passed(manifest, layout):
     """Only complete producer plus EOF-aware original-pipeline evidence can pass."""
     bridge = load_module(layout.archive/'bridge_lifecycle.py', 'verified_bridge_acceptance')
@@ -464,6 +484,7 @@ def run_once(manifest_path, expected_hash, *, layout=None, now=time.time,
         verified = safe.get('exit_verified') is True and safe.get('child_exited') is True and safe.get('job_active_processes') == 0
         result.update(sdk_started=True, exit_verified=verified, guardian_status=safe.get('status') if safe.get('status') in {'completed', 'failed', 'external_deadline_exceeded', 'control_pipe_closed', 'watchdog_fault'} else 'unknown')
         require(verified, 'guardian_exit_unverified_credentials_retained')
+        result['diagnostic_capture_completed']=diagnostic_capture_completed(manifest,layout,safe)
         window_passed = bool(summarize(manifest, layout)) if summarize else diagnostic_passed(manifest, layout)
         result['bounded_pipeline_passed'] = safe.get('status') == 'completed' and window_passed
         result['reception_window_passed'] = result['bounded_pipeline_passed']

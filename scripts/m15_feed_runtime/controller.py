@@ -372,7 +372,7 @@ def verify_manifest(case, now=None):
         raise ValueError('manifest_identity_mismatch')
     start, latest, end = [parse_utc(manifest[k]) for k in
                          ('window_start_utc', 'latest_start_utc', 'window_end_utc')]
-    if not start <= now <= latest < end or (end-start).total_seconds() != 24305:
+    if not start <= now <= latest < end:
         raise ValueError('outside_authorized_start_window')
     expected = {'source.py','health.py','run-spec.json','production-config.json','controller.py','bootstrap.py'}
     if set(manifest['files']) != expected:

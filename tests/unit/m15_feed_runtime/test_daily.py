@@ -126,6 +126,117 @@ class Daily(unittest.TestCase):
         value=daily.status(self.configpath,root=self.root,now=now)
         self.assertEqual(value['state'],'completed');self.assertTrue(value['completion']['bounded_pipeline_passed'])
         self.assertFalse(value['data_current'])
+
+    def failed_result(self):
+        receipt=self.prepare()
+        result={'run_nonce':receipt['run_id'],'status':'failed','exit_verified':True,
+                'credentials_cleaned':True,'error':None,'cleanup_error':None}
+        self.put('run-once-result.json',result)
+        (self.archive()/'consumer-output').mkdir()
+        return receipt['run_id'],result
+
+    def terminal_status(self):
+        return daily.status(self.configpath,root=self.root,
+            now=datetime.fromisoformat('2026-09-25T21:00:00+00:00'))
+
+    def test_terminal_failure_keeps_consumer_first_fault_not_guardian_stop(self):
+        run_id,_=self.failed_result()
+        self.put('consumer-output/summary.json',{'run_id':run_id,'status':'failed',
+            'last_error':{'code':'trade_source_delivery_age_exceeded','error_type':'ValueError',
+                          'message':'private-token-must-not-appear'},'reason':'wire_transfer_backlog'})
+        self.put('consumer-output/live-status.json',{'run_id':run_id,
+            'last_error':{'code':'consumer_summary_write_failed'}})
+        self.put('guardian-result.json',{'run_nonce':run_id,
+            'consumer_failure':'consumer_failed_or_incomplete'})
+        report=self.terminal_status()
+        self.assertEqual(report['state'],'failed')
+        self.assertEqual(report['last_error'],'trade_source_delivery_age_exceeded')
+        self.assertEqual(report['last_error_source'],'consumer.summary.json.last_error')
+        self.assertFalse(report['data_current'])
+        self.assertNotIn('private-token',json.dumps(report))
+
+    def test_terminal_existing_outer_error_remains_authoritative(self):
+        run_id,result=self.failed_result()
+        result['error']='guardian_exit_unverified_credentials_retained'
+        self.put('run-once-result.json',result)
+        self.put('consumer-output/summary.json',{'run_id':run_id,
+            'last_error':{'code':'trade_source_delivery_age_exceeded'}})
+        report=self.terminal_status()
+        self.assertEqual(report['last_error'],result['error'])
+        self.assertEqual(report['last_error_source'],'run_once.error')
+
+    def test_cleanup_problem_is_visible_without_masking_consumer_first_fault(self):
+        run_id,result=self.failed_result()
+        result['cleanup_error']='credential_cleanup_incomplete'
+        self.put('run-once-result.json',result)
+        self.put('consumer-output/summary.json',{'run_id':run_id,
+            'last_error':{'code':'trade_source_delivery_age_exceeded'}})
+        report=self.terminal_status()
+        self.assertEqual(report['last_error'],'trade_source_delivery_age_exceeded')
+        self.assertEqual(report['finalization_errors'],
+            {'cleanup_error':'credential_cleanup_incomplete'})
+
+    def test_terminal_missing_summary_uses_same_run_live_then_guardian(self):
+        run_id,_=self.failed_result()
+        self.put('consumer-output/live-status.json',{'run_id':run_id,
+            'last_error':{'code':'wire_processing_backlog'}})
+        self.put('guardian-result.json',{'run_nonce':run_id,
+            'consumer_failure':'consumer_exit_deadline'})
+        self.assertEqual(self.terminal_status()['last_error'],'wire_processing_backlog')
+        (self.archive()/'consumer-output/live-status.json').unlink()
+        self.assertEqual(self.terminal_status()['last_error'],'consumer_exit_deadline')
+
+    def test_terminal_other_run_failures_cannot_contaminate_current_result(self):
+        run_id,result=self.failed_result()
+        for name in ('summary.json','live-status.json'):
+            self.put('consumer-output/'+name,{'run_id':'other-run',
+                'last_error':{'code':'wire_processing_backlog'}})
+        self.put('guardian-result.json',{'run_nonce':'other-run','consumer_failure':'consumer_exit_deadline'})
+        report=self.terminal_status()
+        self.assertEqual(report['last_error'],'daily_feed_failure_reason_unavailable')
+        self.assertEqual(report['state'],'failed')
+        result['run_nonce']='other-run';self.put('run-once-result.json',result)
+        self.assertEqual(self.terminal_status()['last_error'],'result_identity_mismatch')
+
+    def test_terminal_malformed_supplementary_evidence_is_safe_unknown(self):
+        run_id,_=self.failed_result()
+        for malformed in ([{'run_id':run_id}], '{invalid json',
+                          {'run_id':run_id,'last_error':['private-token']},
+                          {'run_id':run_id,'last_error':{'code':{'private':'token'}}}):
+            with self.subTest(malformed=type(malformed).__name__):
+                self.put('consumer-output/summary.json',malformed)
+                self.put('consumer-output/live-status.json',malformed)
+                self.put('guardian-result.json',{'run_nonce':run_id,'consumer_failure':{'code':[]}})
+                report=self.terminal_status()
+                self.assertEqual(report['last_error'],'daily_feed_failure_reason_unavailable')
+                self.assertNotIn('private-token',json.dumps(report))
+        (self.archive()/'consumer-output/summary.json').write_text('{not-json')
+        self.assertEqual(self.terminal_status()['last_error'],'daily_feed_failure_reason_unavailable')
+        self.put('run-once-result.json',['malformed'])
+        self.assertEqual(self.terminal_status()['last_error'],'result_record_invalid')
+
+    def test_terminal_unknown_message_never_passes_prefix_or_type_through(self):
+        run_id,result=self.failed_result()
+        for value in ('wire_processing_backlog private-token',
+                      {'code':'private-token','error_type':'private-token'},
+                      'RuntimeError: private-token'):
+            self.put('consumer-output/summary.json',{'run_id':run_id,'last_error':value})
+            report=self.terminal_status()
+            self.assertEqual(report['last_error'],'unclassified_exception')
+            self.assertNotIn('private-token',json.dumps(report))
+        result['error']='RuntimeError: private-token';self.put('run-once-result.json',result)
+        report=self.terminal_status()
+        self.assertEqual(report['last_error'],'unclassified_exception')
+        self.assertEqual(report['last_error_source'],'run_once.error')
+
+    def test_completed_result_not_reclassified_from_supplementary_fault(self):
+        run_id,result=self.failed_result();result['status']='completed'
+        self.put('run-once-result.json',result)
+        self.put('consumer-output/summary.json',{'run_id':run_id,
+            'last_error':{'code':'trade_source_delivery_age_exceeded'}})
+        report=self.terminal_status()
+        self.assertEqual(report['state'],'completed')
+        self.assertIsNone(report['last_error'])
     def test_launch_only_dispatches_pinned_native_task_and_outside_refuses(self):
         receipt=self.prepare();now=datetime.fromisoformat('2026-09-25T13:15:01+00:00');calls=[]
         def run(args,**kwargs):
