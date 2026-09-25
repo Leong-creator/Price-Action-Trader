@@ -166,3 +166,49 @@ class Daily(unittest.TestCase):
         self.assertTrue(value['received_transport_current']);self.assertFalse(value['data_current'])
         self.live['current_freshness']['qualified_quote']['symbols']={};self.put('consumer-output/live-status.json',self.live)
         self.assertIsNone(daily.status(self.configpath,root=self.root,now=now)['data_current'])
+
+    def preopen(self,now,*,quality=True):
+        receipt=self.streaming(now)
+        self.live['current_freshness']={kind:{'symbols':{}} for kind in ('qualified_quote','qualified_trade')}
+        self.put('consumer-output/live-status.json',self.live)
+        (self.archive()/'clock/startup').mkdir(parents=True)
+        self.put('clock/startup/assessment.json',{'quality_passed':quality,'finished_at':now.isoformat(),
+            'run_binding':{'run_id':receipt['run_id'],'run_spec_sha256':bootstrap.digest(self.archive()/'run-spec.json')}})
+
+    def test_preopen_empty_qualified_streams_waits_until_exact_open(self):
+        now=datetime.fromisoformat('2026-09-25T13:29:59+00:00');self.preopen(now)
+        value=daily.status(self.configpath,root=self.root,now=now)
+        self.assertEqual(value['state'],'waiting');self.assertEqual(value['market_phase'],'preopen')
+        self.assertTrue(value['received_transport_current']);self.assertIsNone(value['data_current'])
+        opened=daily.status(self.configpath,root=self.root,now=now+timedelta(seconds=1))
+        self.assertEqual(opened['state'],'streaming');self.assertEqual(opened['market_phase'],'regular')
+        self.assertIsNone(opened['data_current'])
+
+    def test_preopen_clock_failure_never_hidden_as_waiting(self):
+        now=datetime.fromisoformat('2026-09-25T13:20:00+00:00');self.preopen(now,quality=False)
+        value=daily.status(self.configpath,root=self.root,now=now)
+        self.assertEqual(value['state'],'unknown');self.assertFalse(value['clock_quality_passed'])
+        self.assertEqual(value['last_error'],'preopen_clock_quality_unproven')
+
+    def test_preopen_consumer_failure_dead_daemon_and_stale_status_not_waiting(self):
+        now=datetime.fromisoformat('2026-09-25T13:20:00+00:00');self.preopen(now)
+        self.live.update(status='failed',last_error='fixture_failure');self.put('consumer-output/live-status.json',self.live)
+        self.assertEqual(daily.status(self.configpath,root=self.root,now=now)['state'],'failed')
+        self.live.update(status='observing',last_error=None,observed_at=(now-timedelta(seconds=6)).isoformat())
+        self.put('consumer-output/live-status.json',self.live)
+        self.assertEqual(daily.status(self.configpath,root=self.root,now=now)['last_error'],'preopen_consumer_status_stale')
+        identity=daily.read_json(self.archive()/'daemon-started.json');identity['proc_start_ticks']+=1;self.put('daemon-started.json',identity)
+        self.assertEqual(daily.status(self.configpath,root=self.root,now=now)['last_error'],'started_without_verified_live_daemon')
+
+    def test_three_second_callback_silence_keeps_qualified_reference_health(self):
+        now=datetime.fromisoformat('2026-09-25T14:00:00+00:00');self.streaming(now)
+        recent=(now-timedelta(seconds=3)).isoformat()
+        for row in self.live['last_source_receipt'].values():row['received_at']=recent
+        for kind in self.live['current_freshness'].values():
+            for row in kind['symbols'].values():row.update(received_at=recent,source_event_at=recent)
+        self.put('consumer-output/live-status.json',self.live)
+        value=daily.status(self.configpath,root=self.root,now=now)
+        self.assertFalse(value['received_transport_current']);self.assertTrue(value['data_current'])
+        self.live['current_freshness']['qualified_trade']['symbols']['QQQ.US']['received_at']=(now-timedelta(seconds=30.001)).isoformat()
+        self.put('consumer-output/live-status.json',self.live)
+        self.assertFalse(daily.status(self.configpath,root=self.root,now=now)['data_current'])

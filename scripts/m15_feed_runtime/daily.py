@@ -238,6 +238,8 @@ def status(config_path,market_date=None,*,root=REPO,now=None):
     except (OSError,ValueError,KeyError,RuntimeError):
         report.update(state='unknown',last_error='daily_manifest_invalid');return report
     run_id=manifest['run_nonce'];report['run_id']=run_id
+    opening=bootstrap.utc(manifest['regular_open_utc']);closing=bootstrap.utc(manifest['regular_close_utc'])
+    report['market_phase']='preopen' if now<opening else 'regular' if now<=closing else 'after_hours'
     completion=maybe(archive/'completion.json');result=maybe(archive/'run-once-result.json')
     if completion:report['completion']={'path':str(archive/'completion.json'),'exit_fences_cleared':completion.get('exit_fences_cleared'),
         **{key:completion.get('run_once',{}).get(key) for key in ('exit_verified','credentials_cleaned','bounded_pipeline_passed')}}
@@ -288,14 +290,29 @@ def status(config_path,market_date=None,*,root=REPO,now=None):
         transport=(fresh(live['observed_at'],5) and fresh(live['last_processed_at'],5)
             and all(fresh(receipts[k]['received_at'],2) for k in ('quote','trade')))
         report['received_transport_current']=transport
+        report['received_transport_basis']='raw quote and trade callbacks received within last 2s; descriptive recency, not a silence fault or source-delivery quality gate'
         qualified=live['current_freshness']
-        report['data_current']=transport and all(
+        report['data_current']=fresh(live['observed_at'],5) and fresh(live['last_processed_at'],5) and all(
             fresh(qualified[k]['symbols'][symbol]['received_at'],30)
             and fresh(qualified[k]['symbols'][symbol]['source_event_at'],30)
             for k in ('qualified_quote','qualified_trade') for symbol in ('SPY.US','QQQ.US'))
-        report['data_current_basis']='qualified SPY/QQQ quote and eligible intraday trade source/receipt within existing 30s reference deadline; transport within 2s; processing/status within 5s; not fresh coverage of all 147 symbols'
+        report['data_current_basis']='qualified SPY/QQQ quote and eligible intraday trade source/receipt within existing 30s reference deadline; processing/status within 5s; no additional inter-event silence limit; not fresh coverage of all 147 symbols'
     except (ValueError,TypeError,KeyError,AttributeError,RuntimeError):report['data_current']=None
-    if live.get('status')=='failed':report.update(state='failed',data_current=False)
+    if live.get('status')=='failed' or live.get('last_error'):
+        report.update(state='failed',data_current=False)
+    elif now<opening and report['state']=='streaming':
+        # Pre-market events deliberately do not qualify as regular-session input.
+        # Waiting is allowed only while the actual consumer and clock are healthy.
+        if report['clock_quality_passed'] is not True:
+            report.update(state='unknown',last_error='preopen_clock_quality_unproven',data_current=None)
+        else:
+            try:consumer_current=fresh(live['observed_at'],5) and fresh(live['last_processed_at'],5)
+            except (ValueError,TypeError,KeyError,RuntimeError):consumer_current=False
+            if not consumer_current:
+                report.update(state='unknown',last_error='preopen_consumer_status_stale',data_current=None)
+            else:
+                report.update(state='waiting',data_current=None,
+                    data_current_basis='preopen waiting for regular-session qualified quote and trade; transport freshness reported separately')
     return report
 
 
