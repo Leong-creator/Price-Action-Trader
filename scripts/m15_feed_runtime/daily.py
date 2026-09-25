@@ -223,7 +223,7 @@ def status(config_path,market_date=None,*,root=REPO,now=None):
     now=now or datetime.now(timezone.utc);day=market_date or today(now)
     _,config=config_at(config_path,root)
     report={'schema_version':'m15.daily-feed-status.v1','market_date':day,'run_id':None,
-        'state':'not_prepared','process_alive':None,'data_current':None,'clock_quality_passed':None,
+        'state':'not_prepared','process_alive':None,'data_current':None,'received_transport_current':None,'clock_quality_passed':None,
         'last_error':None,'completion':None,'acceptance':None,'observed_at':now.isoformat()}
     try:calendar_for(config,day,root)
     except ValueError as exc:
@@ -285,8 +285,15 @@ def status(config_path,market_date=None,*,root=REPO,now=None):
         def fresh(value,limit):
             age=(now-bootstrap.utc(value)).total_seconds();return -0.5<=age<=limit
         receipts=live['last_source_receipt']
-        report['data_current']=(fresh(live['observed_at'],5) and fresh(live['last_processed_at'],5)
+        transport=(fresh(live['observed_at'],5) and fresh(live['last_processed_at'],5)
             and all(fresh(receipts[k]['received_at'],2) for k in ('quote','trade')))
+        report['received_transport_current']=transport
+        qualified=live['current_freshness']
+        report['data_current']=transport and all(
+            fresh(qualified[k]['symbols'][symbol]['received_at'],30)
+            and fresh(qualified[k]['symbols'][symbol]['source_event_at'],30)
+            for k in ('qualified_quote','qualified_trade') for symbol in ('SPY.US','QQQ.US'))
+        report['data_current_basis']='qualified SPY/QQQ quote and eligible intraday trade source/receipt within existing 30s reference deadline; transport within 2s; processing/status within 5s; not fresh coverage of all 147 symbols'
     except (ValueError,TypeError,KeyError,AttributeError,RuntimeError):report['data_current']=None
     if live.get('status')=='failed':report.update(state='failed',data_current=False)
     return report

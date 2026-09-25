@@ -348,6 +348,14 @@ class RunOnceTests(unittest.TestCase):
         path.write_text(json.dumps(summary))
         self.assertFalse(r.diagnostic_passed(f.manifest, f.layout))
 
+    def test_cleanup_precedes_large_evidence_archive(self):
+        original=r.archive_case
+        def archive(layout):
+            self.assertFalse((layout.windows_home_mnt/self.token_rel).exists())
+            return original(layout)
+        with patch.object(r,'archive_case',side_effect=archive):
+            self.assertTrue(self.run_case()['credentials_cleaned'])
+
     def test_archive_failure_still_cleans_known_credential_after_exit(self):
         f = self
         with patch.object(r, 'archive_case', side_effect=OSError('fake archive full')):
@@ -402,3 +410,16 @@ class CompletionExport(unittest.TestCase):
             with patch.object(r,'CASE','case'):r.write_acceptance(manifest,layout,result)
             self.assertEqual(json.loads((a/'completion.json').read_text())['run_once'],result)
             self.assertEqual(json.loads((a/'feed_session_acceptance.json').read_text())['bound_sha'],r.digest(a/'run-spec.json'))
+
+class BoundedArchive(unittest.TestCase):
+    def test_multichunk_evidence_preserves_exact_hash_without_whole_file_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Path(tmp);source=a/'source';target=a/'target'
+            data=b'1234567'*(1024*1024)
+            source.write_bytes(data)
+            with patch.object(r,'read_regular',side_effect=AssertionError('whole-file read forbidden')):
+                sha=r.copy_evidence_stream(source,target)
+                self.assertEqual(r.stream_digest(source),sha)
+                self.assertEqual(r.stream_digest(target),sha)
+            self.assertEqual(sha,hashlib.sha256(data).hexdigest())
+            with self.assertRaises(FileExistsError):r.copy_evidence_stream(source,target)

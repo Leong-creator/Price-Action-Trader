@@ -98,6 +98,7 @@ class Daily(unittest.TestCase):
         (a/'consumer-output').mkdir()
         self.live={'run_id':r['run_id'],'phase':'streaming','status':'observing','last_error':None,'observed_at':now.isoformat(),
             'last_processed_at':now.isoformat(),'last_source_receipt':{k:{'received_at':now.isoformat()} for k in ('quote','trade')}}
+        self.live['current_freshness']={kind:{'symbols':{symbol:{'received_at':now.isoformat(),'source_event_at':now.isoformat()} for symbol in ('SPY.US','QQQ.US')}} for kind in ('qualified_quote','qualified_trade')}
         self.put('consumer-output/live-status.json',self.live);return r
     def test_status_current_requires_receipt_and_processing_not_counts(self):
         now=datetime.fromisoformat('2026-09-25T14:00:00+00:00');self.streaming(now)
@@ -156,3 +157,12 @@ class Daily(unittest.TestCase):
         self.assertEqual(window[2]-window[0],24305);self.assertEqual(sha,bootstrap.digest(self.archive()/'manifest.json'))
         (self.root/'scripts/m15_windows_feed_consumer.py').write_text('# changed')
         with self.assertRaisesRegex(RuntimeError,'consumer_source_changed'):guardian.verify_inputs(m,self.archive(),self.root/'windows')
+
+    def test_new_transport_receipts_with_old_qualified_source_not_healthy(self):
+        now=datetime.fromisoformat('2026-09-25T14:00:00+00:00');self.streaming(now)
+        self.live['current_freshness']['qualified_quote']['symbols']['SPY.US']['source_event_at']=(now-timedelta(minutes=20)).isoformat()
+        self.put('consumer-output/live-status.json',self.live)
+        value=daily.status(self.configpath,root=self.root,now=now)
+        self.assertTrue(value['received_transport_current']);self.assertFalse(value['data_current'])
+        self.live['current_freshness']['qualified_quote']['symbols']={};self.put('consumer-output/live-status.json',self.live)
+        self.assertIsNone(daily.status(self.configpath,root=self.root,now=now)['data_current'])

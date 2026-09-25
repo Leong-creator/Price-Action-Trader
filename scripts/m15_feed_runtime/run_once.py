@@ -292,6 +292,27 @@ def cleanup_credentials(owner, layout, *, allow_incomplete=False):
     save(layout.archive / 'credential-ownership.private.json', owner, update=True)
 
 
+def stream_digest(path):
+    require(not Path(path).is_symlink(),'symlink_rejected')
+    digestor=hashlib.sha256()
+    with os.fdopen(os.open(path,os.O_RDONLY|os.O_NOFOLLOW),'rb') as source:
+        require(stat.S_ISREG(os.fstat(source.fileno()).st_mode),'regular_file_required')
+        for chunk in iter(lambda:source.read(1024*1024),b''):digestor.update(chunk)
+    return digestor.hexdigest()
+
+
+def copy_evidence_stream(source,target):
+    require(not Path(source).is_symlink(),'symlink_rejected')
+    digestor=hashlib.sha256()
+    with os.fdopen(os.open(source,os.O_RDONLY|os.O_NOFOLLOW),'rb') as stream:
+        require(stat.S_ISREG(os.fstat(stream.fileno()).st_mode),'regular_file_required')
+        with os.fdopen(os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600),'wb') as out:
+            for chunk in iter(lambda:stream.read(1024*1024),b''):
+                digestor.update(chunk);out.write(chunk)
+            out.flush();os.fsync(out.fileno())
+    return digestor.hexdigest()
+
+
 def archive_case(layout):
     """Keep private originals until a separate reviewed duplicate cleanup."""
     case = layout.windows_root / CASE
@@ -307,14 +328,11 @@ def archive_case(layout):
             files.extend(Path(folder)/n for n in names)
     records = []
     for source in files:
-        data = read_regular(source)
         relative_path = source.relative_to(case)
         target = destination / relative_path
         target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        with os.fdopen(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as f:
-            f.write(data); f.flush(); os.fsync(f.fileno())
-        sha = hashlib.sha256(data).hexdigest()
-        require(digest(source) == sha and digest(target) == sha, 'case_archive_mismatch')
+        sha=copy_evidence_stream(source,target)
+        require(stream_digest(source)==sha and stream_digest(target)==sha,'case_archive_mismatch')
         records.append({'relative_path': str(relative_path), 'sha256': sha})
     save(layout.archive / 'case-archive-manifest.private.json', {'files': records, 'windows_private_duplicates_retained': True})
     return len(records)
@@ -332,7 +350,8 @@ def _diagnostic_passed(manifest, layout):
     """Only complete producer plus EOF-aware original-pipeline evidence can pass."""
     bridge = load_module(layout.archive/'bridge_lifecycle.py', 'verified_bridge_acceptance')
     safe = json.loads(read_regular(layout.archive/'guardian-result.json'))
-    summary = json.loads(read_regular(layout.archive/CASE/'summary.json'))
+    evidence=layout.archive/CASE if (layout.archive/CASE).exists() else layout.windows_root/CASE
+    summary = json.loads(read_regular(evidence/'summary.json'))
     consumer = json.loads(read_regular(Path(manifest['consumer']['output_dir'])/'summary.json'))
     return (safe.get('consumer_passed') is True
             and bridge.consumer_passed(manifest, safe.get('consumer_exitcode'))
@@ -445,8 +464,6 @@ def run_once(manifest_path, expected_hash, *, layout=None, now=time.time,
         verified = safe.get('exit_verified') is True and safe.get('child_exited') is True and safe.get('job_active_processes') == 0
         result.update(sdk_started=True, exit_verified=verified, guardian_status=safe.get('status') if safe.get('status') in {'completed', 'failed', 'external_deadline_exceeded', 'control_pipe_closed', 'watchdog_fault'} else 'unknown')
         require(verified, 'guardian_exit_unverified_credentials_retained')
-        result['case_evidence_files_archived'] = archive_case(layout)
-        result['windows_private_evidence_duplicate_cleanup_pending'] = True
         window_passed = bool(summarize(manifest, layout)) if summarize else diagnostic_passed(manifest, layout)
         result['bounded_pipeline_passed'] = safe.get('status') == 'completed' and window_passed
         result['reception_window_passed'] = result['bounded_pipeline_passed']
@@ -485,6 +502,13 @@ def run_once(manifest_path, expected_hash, *, layout=None, now=time.time,
             else:
                 result['credentials_retained_exit_unverified'] = True
         if attempted:
+            if result['exit_verified']:
+                try:
+                    result['case_evidence_files_archived']=archive_case(layout)
+                    result['windows_private_evidence_duplicate_cleanup_pending']=True
+                except BaseException as exc:
+                    result['archive_error']=type(exc).__name__
+                    result['status']='failed'
             try:
                 result['protected_states_unchanged'] = all(digest(layout.state_root / e['name']) == e['sha256'] for e in manifest['runner']['protected_states'])
             except BaseException:
