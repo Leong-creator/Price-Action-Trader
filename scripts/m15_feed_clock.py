@@ -44,6 +44,7 @@ def decode(data, packet, t1, t4, m1, m4):
         and m4 >= m1 and abs((t4-t1)-(m4-m1)) < .05)
     return {'valid': valid, 'stratum': stratum, 'leap': leap, 'version': version, 'mode': mode,
             't1': t1, 't2': t2, 't3': t3, 't4': t4, 'monotonic_elapsed': m4-m1,
+            't1_monotonic': m1, 't4_monotonic': m4,
             'offset_seconds': offset, 'roundtrip_seconds': delay,
             'origin_matches': data[24:32] == packet[40:48],
             'kiss_of_death': stratum == 0,
@@ -209,22 +210,26 @@ def _clock_server():
         message=json.loads(line)
         sent,mono_sent=time.time(),time.monotonic()
         print(json.dumps({'id': message['id'], 't2': received, 't3': sent,
-                          'windows_monotonic_elapsed': mono_sent-mono_received}), flush=True)
+                          'windows_monotonic_elapsed': mono_sent-mono_received,
+                          't2_windows_monotonic': mono_received, 't3_windows_monotonic': mono_sent}), flush=True)
 
 
 def handshake_sample(reply, index, t1, t4, m1, m4):
     t2, t3 = reply['t2'], reply['t3']
     elapsed = reply['windows_monotonic_elapsed']
-    numeric = (t1,t2,t3,t4,m1,m4,elapsed)
+    w2, w3 = reply['t2_windows_monotonic'], reply['t3_windows_monotonic']
+    numeric = (t1,t2,t3,t4,m1,m4,elapsed,w2,w3)
     if any(type(value) not in (int,float) or not math.isfinite(value) for value in numeric):
         return {'sample_index': index, 'valid': False, 'error': 'handshake_nonfinite'}
     rtt = (t4-t1)-(t3-t2)
     offset = ((t2-t1)+(t3-t4))/2
     valid = (reply['id'] == index and t3 >= t2 and elapsed >= 0 and m4 >= m1 and rtt >= 0
-             and abs((t4-t1)-(m4-m1)) < .05 and abs((t3-t2)-elapsed) < .05)
+             and abs((t4-t1)-(m4-m1)) < .05 and abs((t3-t2)-elapsed) < .05
+             and w3 >= w2 and abs(elapsed-(w3-w2)) < .000001)
     return {'sample_index': index, 'valid': valid, 't1_wsl': t1, 't2_windows': t2,
             't3_windows': t3, 't4_wsl': t4, 'wsl_monotonic_elapsed': m4-m1,
-            'windows_monotonic_elapsed': elapsed, 'offset_seconds': offset,
+            'windows_monotonic_elapsed': elapsed, 't1_wsl_monotonic': m1, 't4_wsl_monotonic': m4,
+            't2_windows_monotonic': w2, 't3_windows_monotonic': w3, 'offset_seconds': offset,
             'roundtrip_seconds': rtt, 'offset_meaning': 'windows_minus_wsl'}
 
 
@@ -267,11 +272,15 @@ def collect_cross_clock(windows_python):
     good = [row for row in rows if row.get('valid')]
     selected = min(good,key=lambda row:(row['roundtrip_seconds'],row['sample_index'])) if good else None
     continuous = abs((time.time()-start_wall)-(time.monotonic()-start_mono)) < .05
+    windows_continuous = _continuous(_clock_points(rows,(('t2_windows','t2_windows_monotonic'),('t3_windows','t3_windows_monotonic'))))
+    wsl_continuous = _continuous(_clock_points(rows,(('t1_wsl','t1_wsl_monotonic'),('t4_wsl','t4_wsl_monotonic'))))
+    continuous = continuous and windows_continuous and wsl_continuous
     if selected is not None:
         selected = {**selected, 'selected_sample_index': selected['sample_index']}
         if not continuous:
             selected.update(valid=False,error='wall_clock_changed_during_collection')
     return {'raw_samples': rows, 'selected': selected, 'wall_clock_continuous': continuous,
+            'windows_wall_clock_continuous': windows_continuous, 'wsl_wall_clock_continuous': wsl_continuous,
             'sampling_plan': {'sample_count': 3, 'selection_rule': 'minimum_valid_roundtrip_then_index'},
             'startup_excluded': True, 'monotonic_clocks_compared_across_os': False}
 
@@ -284,7 +293,47 @@ def _valid(row):
             and row['roundtrip_seconds'] >= 0)
 
 
+def _clock_points(rows, pairs):
+    points=[]
+    if not isinstance(rows,list):return None
+    for row in rows:
+        if not isinstance(row,dict):return None
+        # Timeouts have no timestamp tuple. A successful tuple must include all
+        # anchors, even when this is not the sample selected by minimum RTT.
+        has_any=any(wall in row or mono in row for wall,mono in pairs)
+        if row.get('valid') is not True and not has_any:continue
+        for wall,mono in pairs:
+            values=(row.get(wall),row.get(mono))
+            if any(type(x) not in (int,float) or not math.isfinite(x) for x in values):return None
+            points.append(values)
+    return points
+
+
+def _continuous(points):
+    if not points:return False
+    # Only values from ONE operating system are compared. Absolute Windows
+    # monotonic values share an origin between Python processes (QPC); WSL's
+    # unrelated monotonic origin is never subtracted from a Windows value.
+    displacements=[wall-mono for wall,mono in points]
+    return max(displacements)-min(displacements)<.05
+
+
+def continuity_evidence(windows_ntp,cross_clock):
+    ntp=_clock_points(windows_ntp.get('raw_samples'),(('t1','t1_monotonic'),('t4','t4_monotonic')))
+    windows=_clock_points(cross_clock.get('raw_samples'),
+        (('t2_windows','t2_windows_monotonic'),('t3_windows','t3_windows_monotonic')))
+    wsl=_clock_points(cross_clock.get('raw_samples'),
+        (('t1_wsl','t1_wsl_monotonic'),('t4_wsl','t4_wsl_monotonic')))
+    anchors=bool(ntp and windows and wsl)
+    return {'anchors_complete':anchors,
+            'windows_across_ntp_and_handshake':bool(anchors and _continuous(ntp+windows)),
+            'windows_across_handshakes':bool(windows and _continuous(windows)),
+            'wsl_across_handshakes':bool(wsl and _continuous(wsl)),
+            'monotonic_values_compared_across_os':False}
+
+
 def assess_time_quality(windows_ntp, cross_clock):
+    continuity=continuity_evidence(windows_ntp,cross_clock)
     windows_rows = windows_ntp.get('samples', [])
     if not isinstance(windows_rows,list):windows_rows=[]
     good = [row for row in windows_rows if _valid(row)]
@@ -292,7 +341,9 @@ def assess_time_quality(windows_ntp, cross_clock):
                    and {row.get('host') for row in windows_rows if isinstance(row,dict)} == set(HOSTS))
     reception = identity_ok and bool(good) and windows_ntp.get('wall_clock_continuous') is True
     selected = cross_clock.get('selected')
-    cross_valid = _valid(selected) and cross_clock.get('wall_clock_continuous') is True
+    continuous=all(continuity[key] for key in ('anchors_complete','windows_across_ntp_and_handshake','windows_across_handshakes','wsl_across_handshakes'))
+    reception = reception and continuous
+    cross_valid = _valid(selected) and cross_clock.get('wall_clock_continuous') is True and continuous
     windows = []
     wsl = []
     for row in good:
@@ -306,11 +357,13 @@ def assess_time_quality(windows_ntp, cross_clock):
                         'uncertainty_seconds':uncertainty,'bound_seconds':abs(offset)+uncertainty,
                         'quality_passed':abs(offset)+uncertainty <= MAX_CLOCK_BOUND_SECONDS})
     win_ok = (identity_ok and windows_ntp.get('wall_clock_continuous') is True
-              and len(windows)==2 and all(row['quality_passed'] for row in windows))
+              and len(windows)==2 and all(row['quality_passed'] for row in windows) and continuous)
     relation_bound = abs(selected['offset_seconds'])+selected['roundtrip_seconds']/2 if cross_valid else None
     relation_ok = cross_valid and relation_bound <= MAX_CLOCK_BOUND_SECONDS
     wsl_ok = relation_ok and len(wsl)==2 and all(row['quality_passed'] for row in wsl)
     reasons=[]
+    if not continuity['anchors_complete']:reasons.append('clock_continuity_anchors_missing')
+    elif not continuous:reasons.append('clock_discontinuity_between_samples_or_phases')
     if not reception:reasons.append('clock_no_valid_windows_sample')
     elif not win_ok:reasons.append('windows_clock_alignment_unproven')
     if not relation_ok:reasons.append('windows_wsl_relation_unproven')
@@ -318,7 +371,7 @@ def assess_time_quality(windows_ntp, cross_clock):
     return {'reception_allowed':reception,'quality_passed':win_ok and wsl_ok,
             'quality_reason':reasons[0] if reasons else None,'quality_reasons':reasons,
             'received_for_diagnosis_only':not (win_ok and wsl_ok),
-            'maximum_clock_bound_seconds':MAX_CLOCK_BOUND_SECONDS,
+            'maximum_clock_bound_seconds':MAX_CLOCK_BOUND_SECONDS,'clock_continuity':continuity,
             'windows':{'quality_passed':win_ok,'estimates':windows},
             'wsl':{'quality_passed':wsl_ok,'estimates':wsl},
             'cross_clock':{'quality_passed':relation_ok,'bound_seconds':relation_bound,

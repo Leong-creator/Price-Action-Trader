@@ -17,11 +17,20 @@ def row(host,index,rtt=.1,offset=.01,valid=True):
 
 
 def ntp():
-    return {'platform':'win32','samples':[row(host,0) for host in c.HOSTS],'wall_clock_continuous':True}
+    rows=[{**row(host,index), 't1':100+index,'t4':100.1+index,
+           't1_monotonic':10+index,'t4_monotonic':10.1+index}
+          for host in c.HOSTS for index in range(3)]
+    return {'platform':'win32','samples':[rows[0],rows[3]],'raw_samples':rows,'wall_clock_continuous':True}
 
 
 def cross(offset=0,rtt=.002):
-    return {'selected':row('pipe',0,rtt,offset),'wall_clock_continuous':True}
+    rows=[{**row('pipe',index,rtt,offset),
+           't2_windows':104+index,'t3_windows':104.001+index,
+           't2_windows_monotonic':14+index,'t3_windows_monotonic':14.001+index,
+           't1_wsl':104+index-offset-rtt/2,'t4_wsl':104.001+index-offset+rtt/2,
+           't1_wsl_monotonic':114+index-rtt/2,'t4_wsl_monotonic':114.001+index+rtt/2}
+          for index in range(3)]
+    return {'selected':rows[0],'raw_samples':rows,'wall_clock_continuous':True}
 
 
 class ClockTests(unittest.TestCase):
@@ -81,7 +90,7 @@ class ClockTests(unittest.TestCase):
         self.assertFalse(result['wsl']['quality_passed'])
 
     def test_offset_sign_derives_wsl_without_comparing_monotonic_origins(self):
-        data=ntp();data['samples']=[row(h,0,.2,.2) for h in c.HOSTS]
+        data=ntp();data['samples']=[{**r,'offset_seconds':.2,'roundtrip_seconds':.2} for r in data['samples']]
         result=c.assess_time_quality(data,cross(offset=-.1,rtt=.02))
         self.assertAlmostEqual(result['wsl']['estimates'][0]['derived_offset_seconds'],.1)
         self.assertAlmostEqual(result['wsl']['estimates'][0]['bound_seconds'],.21)
@@ -97,7 +106,8 @@ class ClockTests(unittest.TestCase):
         self.assertFalse(c.assess_time_quality(ntp(),{})['quality_passed'])
 
     def test_handshake_known_offset_timestamps_and_clock_step_reject(self):
-        reply={'id':1,'t2':100.21,'t3':100.211,'windows_monotonic_elapsed':.001}
+        reply={'id':1,'t2':100.21,'t3':100.211,'windows_monotonic_elapsed':.001,
+               't2_windows_monotonic':50,'t3_windows_monotonic':50.001}
         result=c.handshake_sample(reply,1,100,100.021,1,1.021)
         self.assertTrue(result['valid']);self.assertAlmostEqual(result['offset_seconds'],.2)
         self.assertAlmostEqual(result['roundtrip_seconds'],.02)
@@ -149,6 +159,41 @@ class ClockTests(unittest.TestCase):
         self.assertFalse(c.assess_time_quality(data,cross())['reception_allowed'])
         data=ntp();data['wall_clock_continuous']=False
         self.assertFalse(c.assess_time_quality(data,cross())['reception_allowed'])
+
+    def test_windows_step_between_handshakes_rejects_even_if_first_selected_good(self):
+        relation=cross()
+        for sample in relation['raw_samples'][1:]:
+            sample['t2_windows']+=1;sample['t3_windows']+=1
+        result=c.assess_time_quality(ntp(),relation)
+        self.assertFalse(result['reception_allowed'])
+        self.assertFalse(result['quality_passed'])
+        self.assertEqual(result['quality_reason'],'clock_discontinuity_between_samples_or_phases')
+        self.assertEqual(relation['selected']['sample_index'],0)
+
+    def test_windows_step_between_ntp_and_handshake_rejects(self):
+        relation=cross()
+        for sample in relation['raw_samples']:
+            sample['t2_windows']+=1;sample['t3_windows']+=1
+        result=c.assess_time_quality(ntp(),relation)
+        self.assertTrue(result['clock_continuity']['windows_across_handshakes'])
+        self.assertFalse(result['clock_continuity']['windows_across_ntp_and_handshake'])
+        self.assertFalse(result['quality_passed']);self.assertFalse(result['reception_allowed'])
+
+    def test_windows_step_out_and_back_cannot_hide_behind_net_zero(self):
+        relation=cross()
+        relation['raw_samples'][1]['t2_windows']-=1
+        relation['raw_samples'][1]['t3_windows']-=1
+        self.assertFalse(c.assess_time_quality(ntp(),relation)['quality_passed'])
+
+    def test_wsl_step_between_handshakes_and_missing_anchors_reject(self):
+        relation=cross()
+        relation['raw_samples'][1]['t1_wsl']+=1
+        relation['raw_samples'][1]['t4_wsl']+=1
+        self.assertFalse(c.assess_time_quality(ntp(),relation)['quality_passed'])
+        data=ntp();del data['raw_samples'][1]['t1_monotonic']
+        result=c.assess_time_quality(data,cross())
+        self.assertFalse(result['quality_passed']);self.assertFalse(result['reception_allowed'])
+        self.assertEqual(result['quality_reason'],'clock_continuity_anchors_missing')
 
     def test_ntp_worker_timeout_still_preserves_assessment_no_retries(self):
         with tempfile.TemporaryDirectory() as base:
