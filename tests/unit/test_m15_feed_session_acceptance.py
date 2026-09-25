@@ -61,11 +61,24 @@ class SessionAcceptanceTests(unittest.TestCase):
             'window_start_utc': spec['window_start_utc'], 'window_end_utc': spec['window_end_utc'],
             'checkpoint': checkpoint, 'scheduled_elapsed_seconds': index*1800}
         metadata = {'measurement_id': str(index), 'run_binding': binding}
-        windows = {'platform': 'win32', 'wall_clock_continuous': True, 'samples': [
-            {'host': host, 'valid': True, 'offset_seconds': .01, 'roundtrip_seconds': .02}
-            for host in clock.HOSTS], **metadata}
-        cross = {'wall_clock_continuous': True, 'selected': {
-            'valid': True, 'offset_seconds': .01, 'roundtrip_seconds': .02}, **metadata}
+        # The two OS monotonic clocks intentionally have unrelated origins.
+        # Windows NTP and handshake anchors share only the Windows origin.
+        ntp_rows = [{'host': host, 'sample_index': i, 'valid': True,
+            'offset_seconds': .01, 'roundtrip_seconds': .02,
+            't1': 100+i, 't4': 100.02+i,
+            't1_monotonic': 10+i, 't4_monotonic': 10.02+i}
+            for host in clock.HOSTS for i in range(3)]
+        handshake_rows = [{'valid': True, 'sample_index': i,
+            'offset_seconds': .01, 'roundtrip_seconds': .02,
+            't2_windows': 104+i, 't3_windows': 104.001+i,
+            't2_windows_monotonic': 14+i, 't3_windows_monotonic': 14.001+i,
+            't1_wsl': 103.98+i, 't4_wsl': 104.001+i,
+            't1_wsl_monotonic': 113.99+i, 't4_wsl_monotonic': 114.011+i}
+            for i in range(3)]
+        windows = {'platform': 'win32', 'wall_clock_continuous': True,
+            'samples': [ntp_rows[0], ntp_rows[3]], 'raw_samples': ntp_rows, **metadata}
+        cross = {'wall_clock_continuous': True, 'selected': handshake_rows[0],
+            'raw_samples': handshake_rows, **metadata}
         for name, value in (('windows-ntp.json', windows), ('windows-wsl-handshake.json', cross)):
             (directory/name).write_text(json.dumps(value))
         assessment = clock.assess_time_quality(windows, cross)
