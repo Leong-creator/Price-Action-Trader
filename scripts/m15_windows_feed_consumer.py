@@ -219,7 +219,7 @@ class FeedConsumer:
         self._last_status_write = None
         self.started_wall, self.started_mono = now, time.monotonic()
         self.ready_at = None
-        self.latest_by_symbol = {'quote': {}, 'trade': {}, 'qualified_quote': {}}
+        self.latest_by_symbol = {'quote': {}, 'trade': {}, 'qualified_quote': {}, 'qualified_trade': {}}
         self.latencies = {name: LatencyHistogram() for name in (
             'callback_to_dequeue', 'wire_to_dequeue', 'eligible_trade_source_to_callback',
             'bar_oldest_callback_to_judgment', 'bar_latest_callback_to_judgment', 'router_duration')}
@@ -492,6 +492,10 @@ class FeedConsumer:
                             trade['trade_session'].split('.')[-1].lower() != 'intraday' or
                             trade['trade_type'] not in {'', 'A', 'B', 'D', 'E', 'F', 'K', 'S', 'X', '1', 'C', 'G', 'H', 'I', 'V', 'W'}):
                         continue
+                    previous = self.latest_by_symbol['qualified_trade'].get(symbol)
+                    if previous is None or trade['timestamp'] > previous['source_event_at']:
+                        self.latest_by_symbol['qualified_trade'][symbol] = {
+                            'received_at': received, 'source_event_at': trade['timestamp']}
                     self.latencies['eligible_trade_source_to_callback'].add(
                         (received-trade['timestamp']).total_seconds()*1000)
                     receipt = self.bucket_receipts.setdefault(key, {'first_received_at': received,

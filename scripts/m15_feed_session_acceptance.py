@@ -144,6 +144,15 @@ def evaluate_session(consumer_dir, session_spec, completion, clock_evidence, *, 
         once, guardian, producer = (completion[k] for k in ('run_once', 'guardian', 'producer'))
         require(once.get('run_nonce') == guardian.get('run_nonce') == producer.get('run_id') == run_id, 'completion_identity_mismatch')
         require(completion.get('consumer') == summary, 'completion_consumer_changed')
+        require(once.get('status') == 'completed'
+            and all(once.get(k) is True for k in ('bounded_pipeline_passed',
+                'reception_window_passed', 'diagnostic_window_passed'))
+            and not any(once.get(k) for k in ('error', 'archive_error', 'clock_finalization_error',
+                'cleanup_error', 'credentials_retained_exit_unverified')),
+            'outer_completion_failed')
+        require(guardian.get('status') == 'completed'
+            and not any(guardian.get(k) for k in ('error', 'error_type', 'cleanup_error_type')),
+            'guardian_completion_failed')
         require(all(once.get(k) is True for k in ('exit_verified', 'credentials_cleaned',
             'protected_states_unchanged', 'original_credentials_unchanged')), 'cleanup_not_verified')
         require(guardian.get('child_exitcode') == guardian.get('consumer_exitcode') == 0

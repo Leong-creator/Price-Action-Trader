@@ -83,6 +83,32 @@ class WindowsFeedConsumerTests(unittest.TestCase):
             {'timestamp': self.now.isoformat(), 'price': '101.123456789', 'volume': 3,
              'trade_type': '', 'trade_session': 'Intraday'}]}})
 
+    def test_qualified_trade_only_tracks_actual_builder_eligible_fresh_source(self):
+        self.ready()
+        self.trades('SPY.US')  # Suppressed partial bar, no usable trade credit.
+        self.assertEqual(self.c.latest_by_symbol['qualified_trade'], {})
+        self.now = self.start.replace(minute=35, second=1)
+        self.trades('SPY.US')
+        accepted = dict(self.c.latest_by_symbol['qualified_trade']['SPY.US'])
+        for session, trade_type in (('Pre', ''), ('Post', ''), ('Intraday', 'Z')):
+            self.now += timedelta(milliseconds=100)
+            self.send('trade', {'symbol': 'SPY.US', 'received_at': self.now.isoformat(),
+                'event': {'trades': [{'timestamp': self.now.isoformat(), 'price': '100',
+                    'volume': 1, 'trade_session': session, 'trade_type': trade_type}]}})
+            self.assertEqual(self.c.latest_by_symbol['qualified_trade']['SPY.US'], accepted)
+        # A second execution at an identical source time is retained in volume,
+        # but cannot refresh the qualified stream's clock.
+        self.send('trade', {'symbol': 'SPY.US', 'received_at': self.now.isoformat(),
+            'event': {'trades': [{'timestamp': accepted['source_event_at'].isoformat(),
+                'price': '100', 'volume': 1, 'trade_session': 'Intraday', 'trade_type': ''}]}})
+        self.assertEqual(self.c.latest_by_symbol['qualified_trade']['SPY.US'], accepted)
+        self.now += timedelta(milliseconds=100)
+        self.trades('SPY.US')
+        self.assertEqual(self.c.latest_by_symbol['qualified_trade']['SPY.US']['source_event_at'], self.now)
+        status = self.c.live_status(now=self.now+timedelta(seconds=3))
+        self.assertEqual(status['current_freshness']['qualified_trade']['receipt_within_existing_2000ms_count'], 0)
+        self.assertEqual(status['current_freshness']['qualified_trade']['never_observed_symbols'], ['QQQ.US'])
+
     def test_original_receipts_and_quiet_carry_are_durable_without_entry_credit(self):
         self.ready()
         self.now = self.start.replace(minute=35, second=1)

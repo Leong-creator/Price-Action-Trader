@@ -144,9 +144,11 @@ class FullUniverseBridgeTests(unittest.TestCase):
                 from scripts import m15_feed_session_acceptance as assessor
                 (root/'evidence/summary.json').write_text(json.dumps(result))
                 spec.update(market_open_utc='2026-09-24T13:30:00+00:00', market_close_utc='2026-09-24T20:00:00+00:00', symbols=symbols)
-                once = {'run_nonce': feed.run_id, **dict.fromkeys(('exit_verified', 'credentials_cleaned',
+                once = {'run_nonce': feed.run_id, 'status': 'completed',
+                    **dict.fromkeys(('bounded_pipeline_passed', 'reception_window_passed',
+                    'diagnostic_window_passed', 'exit_verified', 'credentials_cleaned',
                     'protected_states_unchanged', 'original_credentials_unchanged'), True)}
-                guardian = {'run_nonce': feed.run_id, 'child_exitcode': 0, 'consumer_exitcode': 0,
+                guardian = {'run_nonce': feed.run_id, 'status': 'completed', 'child_exitcode': 0, 'consumer_exitcode': 0,
                     'job_active_processes': 0, **dict.fromkeys(('child_exited', 'consumer_exited', 'exit_verified', 'consumer_passed'), True)}
                 complete = {'run_once': once, 'guardian': guardian, 'consumer': result, 'exit_fences_cleared': True,
                     'producer': {'run_id': feed.run_id, 'terminal_sequence': result['last_sequence'],
@@ -157,6 +159,18 @@ class FullUniverseBridgeTests(unittest.TestCase):
                     passed = assessor.evaluate_session(root/'evidence', spec, complete, {}, session_spec_sha256='test')
                     self.assertTrue(passed['normal_full_session_observation_passed'], passed['failures'])
                     self.assertFalse(passed['trading_enabled'])
+                    for field, value in (('status', 'failed'), ('bounded_pipeline_passed', False),
+                            ('reception_window_passed', False), ('diagnostic_window_passed', False),
+                            ('archive_error', 'OSError'), ('clock_finalization_error', 'RuntimeError')):
+                        failed_completion = copy.deepcopy(complete)
+                        failed_completion['run_once'][field] = value
+                        rejected = assessor.evaluate_session(root/'evidence', spec, failed_completion, {}, session_spec_sha256='test')
+                        self.assertIn('outer_completion_failed', rejected['failures'], field)
+                        self.assertFalse(rejected['normal_full_session_observation_passed'])
+                    failed_guardian = copy.deepcopy(complete)
+                    failed_guardian['guardian']['status'] = 'failed'
+                    rejected = assessor.evaluate_session(root/'evidence', spec, failed_guardian, {}, session_spec_sha256='test')
+                    self.assertIn('guardian_completion_failed', rejected['failures'])
                     for label, mutate in (
                         ('duplicate', lambda rows: rows+[rows[0]]),
                         ('missing', lambda rows: rows[1:]),
