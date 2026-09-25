@@ -71,6 +71,16 @@ class M15BackgroundWatchdogTest(unittest.TestCase):
             self.assertEqual(result["watchdog_status"], "needs_attention")
             self.assertEqual(result["daily_feed"]["state"], None)
 
+    def test_premarket_wait_does_not_hide_known_clock_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(Path(tmp), runtime_engine="daily_feed")
+            feed = {"schema_version": "m15.daily-feed-status.v1", "state": "waiting",
+                    "process_alive": True, "clock_quality_passed": False}
+            result = run_background_watchdog_once(config, command_runner=lambda *_: type(
+                "Result", (), {"returncode": 0, "stdout": json.dumps(feed)})())
+            self.assertEqual(result["watchdog_status"], "needs_attention")
+            self.assertEqual(result["steps"][0]["stderr_tail"], "daily_feed_clock_quality_unproven")
+
     def test_watchdog_daily_command_cannot_launch_or_prepare(self):
         for action in ("launch", "prepare", "status --launch"):
             with self.assertRaises(ValueError):

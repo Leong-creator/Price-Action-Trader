@@ -281,6 +281,8 @@ def run_daily_feed_watchdog_once(config, runner, generated_at):
         elif state == "starting":
             if feed.get("process_alive") is not True:
                 reason = "daily_feed_start_process_unproven"
+        elif waiting and feed.get("clock_quality_passed") is False:
+            reason = "daily_feed_clock_quality_unproven"
         elif not waiting:
             reason = "daily_feed_" + (state if state in {"failed", "not_prepared"} else "unknown")
     labels = {"streaming": "行情接收中", "completed": "本次行情窗口已结束",
@@ -288,10 +290,16 @@ def run_daily_feed_watchdog_once(config, runner, generated_at):
               "non_trading_day": "非交易日", "starting": "行情正在初始化",
               "failed": "行情运行故障", "not_prepared": "当日任务尚未准备", "unknown": "当前状态未知"}
     safe_feed = {key: feed.get(key) for key in (
-        "schema_version", "state", "market_date", "run_id", "process_alive",
-        "data_current", "clock_quality_passed", "last_error", "completion", "acceptance"
+        "schema_version", "state", "market_date", "market_phase", "run_id", "process_alive",
+        "data_current", "data_current_basis", "received_transport_current", "received_transport_basis",
+        "clock_quality_passed", "last_error",
+        "source_receipt", "processing_updated_at", "consumer_observed_at", "counts", "completion", "acceptance"
     )}
     text = labels.get(state, labels["unknown"])
+    if state == "waiting" and feed.get("market_phase") == "preopen" and feed.get("process_alive") is True:
+        text = "盘前接收中，等待正常交易时段"
+    elif state == "starting" and feed.get("market_phase") == "after_hours":
+        text = "行情窗口结束，正在完成收尾核验"
     if reason:
         text += "；需检查：" + reason
     payload = {

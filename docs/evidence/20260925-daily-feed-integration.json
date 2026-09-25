@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-25T09:45:34.515534+00:00",
+  "scope": "Daily official Windows quote reception and original WSL strategy observation only",
+  "implementation_review_passed": true,
+  "real_full_sessions_passed_at_implementation": 0,
+  "account_access": false,
+  "order_access": false,
+  "system_clock_or_network_changed": false,
+  "windows_sdk": "5.0.0",
+  "windows_python": "3.14.3",
+  "stable_environment_receipt_sha256": "fa1be3b06873543f4d91b313c10e7dece74c4ea32ad75d5bbff650b724080659",
+  "actual_clock_check": {
+    "started_at": "2026-09-25T09:26:50.180710+00:00",
+    "finished_at": "2026-09-25T09:26:55.153561+00:00",
+    "quality_passed": true,
+    "windows": {
+      "quality_passed": true,
+      "estimates": [
+        {
+          "host": "time.windows.com",
+          "offset_seconds": 0.13539016246795654,
+          "bound_seconds": 0.2598538398742676,
+          "quality_passed": true
+        },
+        {
+          "host": "time.cloudflare.com",
+          "offset_seconds": 0.14196133613586426,
+          "bound_seconds": 0.240492582321167,
+          "quality_passed": true
+        }
+      ]
+    },
+    "wsl": {
+      "quality_passed": true,
+      "estimates": [
+        {
+          "host": "time.windows.com",
+          "derived_offset_seconds": 0.13543856143951416,
+          "uncertainty_seconds": 0.12462413311004639,
+          "bound_seconds": 0.26006269454956055,
+          "quality_passed": true
+        },
+        {
+          "host": "time.cloudflare.com",
+          "derived_offset_seconds": 0.14200973510742188,
+          "uncertainty_seconds": 0.09869170188903809,
+          "bound_seconds": 0.24070143699645996,
+          "quality_passed": true
+        }
+      ]
+    },
+    "clock_continuity": {
+      "anchors_complete": true,
+      "windows_across_ntp_and_handshake": true,
+      "windows_across_handshakes": true,
+      "wsl_across_handshakes": true,
+      "monotonic_values_compared_across_os": false
+    }
+  },
+  "offline_verification": {
+    "final_supervisor_tests": 104,
+    "final_integration_tests": 70,
+    "clock_tests": 23,
+    "official_linux_wheel_compatibility_and_disposable_tamper_tests": 2,
+    "real_full_day_fixture_bars": 11466,
+    "real_full_day_fixture_boundaries": 78,
+    "fixture_is_live_evidence": false
+  },
+  "native_no_sdk_handoff": {
+    "heartbeats": 152,
+    "duration_seconds": 30.6922584,
+    "exitcode": 0,
+    "sdk_started": false
+  },
+  "retirement": {
+    "old_tasks_archived_disabled": 2,
+    "old_official_temp_environment_files_archived_verified_removed": 895,
+    "market_evidence_preserved": true,
+    "protected_states_unchanged": 5
+  },
+  "planned_market_dates": [
+    "2026-09-25",
+    "2026-09-28",
+    "2026-09-29"
+  ],
+  "scheduled_window_beijing": "21:15 to following 04:00:05; latest new launch 21:16",
+  "actual_deployment_result": "/home/hgl/project-archives/Price-Action-Trader/20260925-daily-feed/deployment-result.json",
+  "daily_evidence_root": "/home/hgl/project-archives/Price-Action-Trader/daily-feed-sessions",
+  "independent_review": "/home/hgl/project-archives/Price-Action-Trader/20260925-daily-feed/review/daily-supervisor/final-independent-review.json",
+  "remaining": [
+    "Actual task registration/readback is recorded externally after this clean source commit",
+    "One real normal full session before feed recovery qualification; three consecutive before stability claim",
+    "WSL direct SDK initialization remains unresolved and is not the selected quote ingress",
+    "Account and order recovery remain a separate reviewed phase"
+  ]
+}
