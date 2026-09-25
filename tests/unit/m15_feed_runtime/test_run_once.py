@@ -155,6 +155,14 @@ class RunOnceTests(unittest.TestCase):
         self.assertEqual(result['error'], 'BlockingIOError')
         self.assertEqual(self.calls, 0)
 
+    def test_legacy_windows_fence_refuses_new_root(self):
+        legacy=self.layout.archive/'legacy-fence.json';legacy.write_text('old unresolved run')
+        self.manifest['layout']={'additional_windows_fences':[str(legacy)]}
+        result=self.run_case()
+        self.assertEqual(result['error'],'legacy_windows_fence_exists')
+        self.assertEqual(self.calls,0)
+        self.assertFalse((self.layout.windows_home_mnt/self.token_rel).exists())
+
     def test_existing_fence_refused(self):
         self.layout.fence.write_text('existing')
         self.assertEqual(self.run_case()['error'], 'active_fence_exists')
