@@ -83,6 +83,68 @@ class WindowsFeedConsumerTests(unittest.TestCase):
             {'timestamp': self.now.isoformat(), 'price': '101.123456789', 'volume': 3,
              'trade_type': '', 'trade_session': 'Intraday'}]}})
 
+    def test_original_receipts_and_quiet_carry_are_durable_without_entry_credit(self):
+        self.ready()
+        self.now = self.start.replace(minute=35, second=1)
+        self.quote('SPY.US')
+        self.trades('SPY.US')
+        original = self.now
+        self.now = self.start.replace(minute=40, second=2)
+        for symbol in self.symbols:
+            self.quote(symbol)
+        self.send('watermark', {'received_through': self.now.isoformat()})
+        rows = [json.loads(line) for line in (self.c.output/'bar-evidence.jsonl').read_text().splitlines()]
+        spy = next(row for row in rows if row['bar']['symbol'] == 'SPY')
+        quiet = next(row for row in rows if row['bar']['symbol'] == 'QQQ')
+        self.assertEqual(spy['trade_callback_receipts']['first_received_at'], original.isoformat())
+        self.assertEqual(spy['trade_callback_receipts']['trade_count'], 2)
+        self.assertEqual(quiet['classification'], 'blocked_carry')
+        self.assertFalse(quiet['eligible_for_strategy_input'])
+        self.assertEqual(quiet['bar']['market_data_blocked_reason'], 'no_trade_carry_forward')
+        self.assertNotIn('QQQ', {row['symbol'] for row in self.c.evidence.strategy.context.rows()})
+        status = self.c.live_status(now=self.now+timedelta(seconds=4))
+        self.assertEqual(status['fresh_quote_symbol_count'], 2)
+        self.assertEqual(status['current_freshness']['qualified_quote']['receipt_within_existing_2000ms_count'], 0)
+        hist = self.c.summary()['latency_evidence']['bar_latest_callback_to_judgment']
+        self.assertEqual(hist['count'], 1)
+        self.assertGreaterEqual(hist['min'], 301000)
+
+    def test_slow_bar_audit_write_does_not_refresh_or_hide_processing_age(self):
+        self.ready()
+        self.now = self.start.replace(minute=35, second=1)
+        for symbol in self.symbols:
+            self.quote(symbol)
+            self.trades(symbol)
+        self.now = self.start.replace(minute=40, second=2)
+        for symbol in self.symbols:
+            self.quote(symbol)
+        mono = [100.0]
+        original = self.c._append_evidence
+        def slow(filename, rows):
+            original(filename, rows)
+            mono[0] += 3
+        with patch.object(consumer.time, 'monotonic', side_effect=lambda: mono[0]), \
+                patch.object(self.c, '_append_evidence', side_effect=slow):
+            with self.assertRaises((ValueError, RuntimeError)):
+                self.send('watermark', {'received_through': self.now.isoformat()})
+        self.assertEqual(self.c.evidence.strategy.evaluations, 0)
+        self.assertIsNotNone(self.c.last_error)
+
+    def test_evidence_write_failure_cannot_leave_healthy_boundary(self):
+        self.ready()
+        self.now = self.start.replace(minute=35, second=1)
+        for symbol in self.symbols:
+            self.quote(symbol)
+            self.trades(symbol)
+        self.now = self.start.replace(minute=40, second=2)
+        for symbol in self.symbols:
+            self.quote(symbol)
+        with patch.object(Path, 'open', side_effect=OSError('private storage detail')):
+            with self.assertRaisesRegex(ValueError, '^consumer_evidence_write_failed$'):
+                self.send('watermark', {'received_through': self.now.isoformat()})
+        self.assertEqual(self.c.last_error['code'], 'consumer_evidence_write_failed')
+        self.assertEqual(self.c.evidence.strategy.evaluations, 0)
+
     def test_actual_builder_and_original_router_equal_timestamp_trades_retained(self):
         self.ready()
         self.now = self.start.replace(minute=35, second=1)

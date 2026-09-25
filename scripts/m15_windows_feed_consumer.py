@@ -46,7 +46,7 @@ wire_market_event_before_ready wire_market_symbol_unknown wire_tail_receipt_inva
 wire_tail_trade_for_closed_boundary wire_event_behind_watermark wire_quote_session_invalid
 wire_heartbeat_before_ready wire_watermark_outside_prefix wire_watermark_regressed
 wire_abnormal_end wire_premature_or_incomplete_end wire_producer_reported_error wire_unknown_kind
-consumer_clock_discontinuity consumer_status_write_failed consumer_summary_write_failed
+consumer_clock_discontinuity consumer_status_write_failed consumer_summary_write_failed consumer_evidence_write_failed
 wire_end_deadline_exceeded wire_stream_symlink wire_reader_backlog_or_truncation
 wire_line_size_exceeded wire_watermark_in_future wire_trailing_content_after_end wire_partial_line_size_exceeded
 wire_nonfinite_json
@@ -154,6 +154,33 @@ def restore_event(payload, kind):
     return row
 
 
+class LatencyHistogram:
+    """Bounded millisecond histogram; percentile values are upper bin edges."""
+    def __init__(self):
+        self.bins = Counter()
+        self.minimum = self.maximum = None
+
+    def add(self, milliseconds):
+        self.bins[math.ceil(milliseconds)] += 1
+        self.minimum = milliseconds if self.minimum is None else min(self.minimum, milliseconds)
+        self.maximum = milliseconds if self.maximum is None else max(self.maximum, milliseconds)
+
+    def summary(self):
+        ordered = sorted(self.bins.items())
+        count = sum(self.bins.values())
+        def rank(q):
+            remaining = math.ceil(count * q)
+            for value, n in ordered:
+                remaining -= n
+                if remaining <= 0:
+                    return value
+            return None
+        return {'count': count, 'unit': 'milliseconds', 'resolution_ms': 1,
+            'quantile_method': 'nearest_rank_upper_bin_edge', 'min': self.minimum, 'max': self.maximum,
+            'p50': rank(.5), 'p95': rank(.95), 'p99': rank(.99),
+            'histogram_ms_upper_edge': [[value, n] for value, n in ordered]}
+
+
 class FeedConsumer:
     def __init__(self, config, output, run_id, start, end, *, now=None):
         self.start, self.end = stamp(start), stamp(end)
@@ -191,6 +218,72 @@ class FeedConsumer:
         self.last_error = None
         self._last_status_write = None
         self.started_wall, self.started_mono = now, time.monotonic()
+        self.ready_at = None
+        self.latest_by_symbol = {'quote': {}, 'trade': {}, 'qualified_quote': {}}
+        self.latencies = {name: LatencyHistogram() for name in (
+            'callback_to_dequeue', 'wire_to_dequeue', 'eligible_trade_source_to_callback',
+            'bar_oldest_callback_to_judgment', 'bar_latest_callback_to_judgment', 'router_duration')}
+        self.bucket_receipts = {}
+        self.persisted_bar_count = 0
+
+    def _append_evidence(self, filename, rows):
+        try:
+            with (self.output/filename).open('a', encoding='utf-8') as out:
+                for row in rows:
+                    out.write(json.dumps(row, separators=(',', ':'), allow_nan=False) + '\n')
+                out.flush()
+                os.fsync(out.fileno())
+        except (OSError, ValueError, TypeError) as error:
+            raise ValueError('consumer_evidence_write_failed') from error
+
+    def _record_boundary(self, bars, now):
+        # Preserve the builder output verbatim. Its received_at is bar sealing
+        # time, not callback receipt; the separate receipt range prevents that
+        # timestamp from disguising delayed input.
+        boundary_begin = time.monotonic()
+        records = []
+        receipt_ranges = []
+        for bar in bars:
+            key = (bar['symbol'] + '.US', stamp(bar['bar_open_at']))
+            receipts = self.bucket_receipts.pop(key, None)
+            if receipts:
+                receipt_ranges.append(receipts)
+            records.append({'schema_version': 1, 'run_id': self.run_id,
+                'wire_sequence': self.sequence, 'watermark': self.watermark.isoformat(),
+                'formed_at': now.isoformat(), 'bar': dict(bar),
+                'classification': ('blocked_carry' if bar['market_data_blocked_reason'] else 'price_forming_trade'),
+                'trade_callback_receipts': ({k: v.isoformat() if isinstance(v, datetime) else v
+                    for k, v in receipts.items()} if receipts else None),
+                'eligible_for_strategy_input': not bool(bar['market_data_blocked_reason'])})
+        self._append_evidence('bar-evidence.jsonl', records)
+        self.persisted_bar_count += len(records)
+        before = self.evidence.strategy.evaluations
+        begin = time.monotonic()
+        judgment_started = now + timedelta(seconds=max(0, begin-boundary_begin))
+        failure = None
+        try:
+            self._emit({'kind': 'bars', 'rows': bars}, judgment_started)
+        except BaseException as error:
+            failure = safe_exception(error)
+            self.record_error(error, now=now, during='boundary_judgment')
+            raise
+        finally:
+            duration = max(0, time.monotonic() - begin)
+            finished = judgment_started + timedelta(seconds=duration)
+            self.latencies['router_duration'].add(duration*1000)
+            for receipts in receipt_ranges:
+                for key, field in (('bar_oldest_callback_to_judgment', 'first_received_at'),
+                                   ('bar_latest_callback_to_judgment', 'last_received_at')):
+                    self.latencies[key].add((finished-receipts[field]).total_seconds()*1000)
+            self._append_evidence('boundary-evidence.jsonl', [{'schema_version': 1,
+                'run_id': self.run_id, 'wire_sequence': self.sequence,
+                'bar_close_at': bars[0]['bar_close_at'], 'watermark': self.watermark.isoformat(),
+                'dequeued_at': now.isoformat(), 'judgment_started_at': judgment_started.isoformat(),
+                'judgment_finished_at': finished.isoformat(),
+                'duration_ms': duration*1000, 'bar_count': len(bars),
+                'strategy_evaluations_before': before,
+                'strategy_evaluations_after': self.evidence.strategy.evaluations,
+                'accepted': failure is None, 'error': failure}])
 
     def _emit(self, message, now):
         self.evidence.consume(message, now)
@@ -232,6 +325,10 @@ class FeedConsumer:
                 if events:
                     covered = self.quote_wire_symbols if kind == 'quote' else self.trade_wire_symbols
                     covered.add(payload['symbol'])
+                    self.latest_by_symbol[kind][payload['symbol']] = {'received_at': received,
+                        'source_event_at': max(stamp(event['timestamp']) for event in events)}
+                    self.latencies['callback_to_dequeue'].add((now-received).total_seconds()*1000)
+                    self.latencies['wire_to_dequeue'].add((now-stamp(row['emitted_at'])).total_seconds()*1000)
                     self.last_source_receipt[kind] = {'received_at': received.isoformat(),
                         'source_event_at': max(stamp(event['timestamp']) for event in events).isoformat(),
                         'wire_sequence': self.sequence}
@@ -321,6 +418,7 @@ class FeedConsumer:
             self.builder.complete_bar_open_not_before = partial
             self._emit({'kind': 'ready', 'partial_bar_suppressed_until': partial.isoformat()}, now)
             self.ready = True
+            self.ready_at = now
         elif kind in ('quote', 'trade'):
             if not self.ready:
                 raise ValueError('wire_market_event_before_ready')
@@ -379,6 +477,7 @@ class FeedConsumer:
                 self.quote_source_times[symbol] = source
                 self.quote_classifications['fresh_quote'] += 1
                 self.fresh_quote_symbols.add(symbol)
+                self.latest_by_symbol['qualified_quote'][symbol] = {'received_at': received, 'source_event_at': source}
                 self._emit({'kind': 'quote_state', 'symbol': symbol, 'payload': event,
                             'received_at': received.isoformat(), 'source_mode': 'official_sdk_push'}, now)
             else:
@@ -386,6 +485,22 @@ class FeedConsumer:
                 self.trade_count += len(event['trades'])
                 self.builder.on_trade(symbol, event, received_at=received,
                     maximum_source_delivery_age_ms=self.config.maximum_source_delivery_age_ms, processed_at=now)
+                for trade in event['trades']:
+                    opened = rules.floor_bar_open(trade['timestamp'], self.config.bar_minutes)
+                    key = (symbol, opened)
+                    if (key not in self.builder._bars or
+                            trade['trade_session'].split('.')[-1].lower() != 'intraday' or
+                            trade['trade_type'] not in {'', 'A', 'B', 'D', 'E', 'F', 'K', 'S', 'X', '1', 'C', 'G', 'H', 'I', 'V', 'W'}):
+                        continue
+                    self.latencies['eligible_trade_source_to_callback'].add(
+                        (received-trade['timestamp']).total_seconds()*1000)
+                    receipt = self.bucket_receipts.setdefault(key, {'first_received_at': received,
+                        'last_received_at': received, 'trade_count': 0, 'max_callback_to_dequeue_ms': 0})
+                    receipt['first_received_at'] = min(receipt['first_received_at'], received)
+                    receipt['last_received_at'] = max(receipt['last_received_at'], received)
+                    receipt['trade_count'] += 1
+                    receipt['max_callback_to_dequeue_ms'] = max(receipt['max_callback_to_dequeue_ms'],
+                        (now-received).total_seconds()*1000)
                 if symbol in ('SPY.US', 'QQQ.US') and event['trades']:
                     self._emit({'kind': 'market_activity', 'symbol': symbol,
                         'received_at': received.isoformat(), 'source_mode': 'official_sdk_trade_push'}, now)
@@ -408,7 +523,7 @@ class FeedConsumer:
                     return  # Terminal prefix evidence never seals a bar.
                 bars = self.builder.complete_boundary(self.symbols, through)
                 if bars:
-                    self._emit({'kind': 'bars', 'rows': bars}, now)
+                    self._record_boundary(bars, now)
         elif kind == 'end':
             if not self.ready or payload.get('reason') != 'window_completed':
                 raise ValueError('wire_abnormal_end')
@@ -441,6 +556,18 @@ class FeedConsumer:
             self.evidence.check_deadlines(now)
 
     def live_status(self, *, now=None):
+        now = stamp(now or datetime.now(UTC))
+        freshness = {}
+        for kind, symbols in self.latest_by_symbol.items():
+            ages = {symbol: {'received_at': row['received_at'].isoformat(),
+                'source_event_at': row['source_event_at'].isoformat(),
+                'receipt_age_ms': (now-row['received_at']).total_seconds()*1000,
+                'source_age_ms': (now-row['source_event_at']).total_seconds()*1000}
+                for symbol, row in symbols.items()}
+            freshness[kind] = {'symbols': ages, 'never_observed_symbols': sorted(set(self.symbols)-set(ages)),
+                'receipt_within_existing_2000ms_count': sum(-2000 <= row['receipt_age_ms'] <=
+                    self.config.maximum_source_delivery_age_ms for row in ages.values()),
+                'basis': 'age_at_observed_at_quiet_symbols_not_inferred_failed'}
         session = self.evidence.session
         return {'schema_version': 1, 'run_id': self.run_id,
             'observed_at': stamp(now or datetime.now(UTC)).isoformat(),
@@ -451,6 +578,7 @@ class FeedConsumer:
             'attempted_sequence': self.attempted_sequence,
             'last_processed_at': self.last_processed_at.isoformat() if self.last_processed_at else None,
             'last_source_receipt': self.last_source_receipt,
+            'current_freshness': freshness,
             'quote_wire_symbol_count': len(self.quote_wire_symbols),
             'trade_wire_symbol_count': len(self.trade_wire_symbols),
             'fresh_quote_symbol_count': len(self.fresh_quote_symbols),
@@ -509,6 +637,10 @@ class FeedConsumer:
             'all_expected_boundaries_observed': all_boundaries,
             'producer_end_sequence': self.end_sequence,
             'ignored_tail_events': self.ignored_tail_events,
+            'ready_at': self.ready_at.isoformat() if self.ready_at else None,
+            'symbols': list(self.symbols), 'persisted_bar_count': self.persisted_bar_count,
+            'maximum_source_delivery_age_ms': self.config.maximum_source_delivery_age_ms,
+            'latency_evidence': {name: hist.summary() for name, hist in self.latencies.items()},
             'quote_classifications': dict(self.quote_classifications),
             'realtime_tradable_bar_count': traded, 'trade_count': self.trade_count,
             'last_sequence': self.sequence, 'message_counts': dict(self.counts),

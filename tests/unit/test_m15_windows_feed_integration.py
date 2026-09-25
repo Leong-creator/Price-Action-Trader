@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 import json
+import copy
 from pathlib import Path
 import socket
 import tempfile
@@ -25,7 +26,11 @@ class FullUniverseBridgeTests(unittest.TestCase):
         self.assert_full_wire(datetime(2026, 9, 24, 19, 50, 1, tzinfo=UTC),
                               datetime(2026, 9, 24, 20, 0, 5, tzinfo=UTC))
 
-    def assert_full_wire(self, start, end):
+    def test_normal_full_day_147_times_78_original_pipeline_and_assessor(self):
+        self.assert_full_wire(datetime(2026, 9, 24, 13, 25, 1, tzinfo=UTC),
+            datetime(2026, 9, 24, 20, 0, 5, tzinfo=UTC), accelerated=True, acceptance=True)
+
+    def assert_full_wire(self, start, end, *, accelerated=False, acceptance=False):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
             root = Path(directory)
             config = replace(consumer.rules.load_config(), output_dir=root/'unused',
@@ -85,6 +90,11 @@ class FullUniverseBridgeTests(unittest.TestCase):
             sent_bar_trades = set()
             last_second = [None]
             def advance(seconds):
+                if accelerated:
+                    next_settle = consumer.rules.floor_bar_open(clock[0], 5) + timedelta(seconds=2)
+                    if next_settle <= clock[0]:
+                        next_settle += timedelta(minutes=5)
+                    seconds = min(10, (next_settle-clock[0]).total_seconds(), (end-clock[0]).total_seconds())
                 clock[0] += timedelta(seconds=seconds)
                 mono[0] += seconds
                 second = clock[0].replace(microsecond=0)
@@ -125,6 +135,44 @@ class FullUniverseBridgeTests(unittest.TestCase):
             self.assertTrue(all(Decimal(str(r['high'])) == Decimal('101.123456789') for r in nonreference))
             self.assertFalse(result['full_session_acceptance'])
             self.assertFalse(result['order_access'])
+            persisted = [json.loads(line) for line in (root/'evidence/bar-evidence.jsonl').read_text().splitlines()]
+            self.assertEqual(len(persisted), 147*expected)
+            self.assertEqual(len({(row['bar']['symbol'], row['bar']['bar_close_at']) for row in persisted}), 147*expected)
+            self.assertTrue(all(row['trade_callback_receipts']['max_callback_to_dequeue_ms'] == 0 for row in persisted))
+            self.assertEqual(result['latency_evidence']['bar_latest_callback_to_judgment']['count'], 147*expected)
+            if acceptance:
+                from scripts import m15_feed_session_acceptance as assessor
+                (root/'evidence/summary.json').write_text(json.dumps(result))
+                spec.update(market_open_utc='2026-09-24T13:30:00+00:00', market_close_utc='2026-09-24T20:00:00+00:00', symbols=symbols)
+                once = {'run_nonce': feed.run_id, **dict.fromkeys(('exit_verified', 'credentials_cleaned',
+                    'protected_states_unchanged', 'original_credentials_unchanged'), True)}
+                guardian = {'run_nonce': feed.run_id, 'child_exitcode': 0, 'consumer_exitcode': 0,
+                    'job_active_processes': 0, **dict.fromkeys(('child_exited', 'consumer_exited', 'exit_verified', 'consumer_passed'), True)}
+                complete = {'run_once': once, 'guardian': guardian, 'consumer': result, 'exit_fences_cleared': True,
+                    'producer': {'run_id': feed.run_id, 'terminal_sequence': result['last_sequence'],
+                        'completed_window': True, 'reason': None, 'status': 'window_observed',
+                        'window_start_utc': spec['window_start_utc'], 'window_end_utc': spec['window_end_utc']}}
+                # This fixture exercises the feed/exit assessor, not real UTC quality.
+                with patch.object(assessor, 'verify_clock_evidence', return_value={'passed': True, 'scope': 'test_only'}):
+                    passed = assessor.evaluate_session(root/'evidence', spec, complete, {}, session_spec_sha256='test')
+                    self.assertTrue(passed['normal_full_session_observation_passed'], passed['failures'])
+                    self.assertFalse(passed['trading_enabled'])
+                    for label, mutate in (
+                        ('duplicate', lambda rows: rows+[rows[0]]),
+                        ('missing', lambda rows: rows[1:]),
+                        ('late', lambda rows: [dict(rows[0], formed_at='2026-09-24T20:01:00+00:00')]+rows[1:]),
+                        ('carry_falsely_tradable', lambda rows: [dict(rows[0], classification='blocked_carry')]+rows[1:])):
+                        altered = mutate(copy.deepcopy(persisted))
+                        (root/'evidence/bar-evidence.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in altered))
+                        rejected = assessor.evaluate_session(root/'evidence', spec, complete, {}, session_spec_sha256='test')
+                        self.assertFalse(rejected['normal_full_session_observation_passed'], label)
+                    (root/'evidence/bar-evidence.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in persisted))
+                    changed = copy.deepcopy(complete); changed['producer']['terminal_sequence'] -= 1
+                    rejected = assessor.evaluate_session(root/'evidence', spec, changed, {}, session_spec_sha256='test')
+                    self.assertIn('terminal_sequence_or_tail_incomplete', rejected['failures'])
+                with patch.object(assessor, 'verify_clock_evidence', return_value={'passed': False}):
+                    rejected = assessor.evaluate_session(root/'evidence', spec, complete, {}, session_spec_sha256='test')
+                    self.assertIn('clock_evidence_not_passed', rejected['failures'])
 
 
 if __name__ == '__main__':
