@@ -3,8 +3,11 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 import io
 import json
+import os
 from pathlib import Path
 import socket
+import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace as NS
 import unittest
@@ -111,6 +114,119 @@ class ProducerTests(unittest.TestCase):
         inbox=p.CallbackQueue(['SPY.US']);inbox.capture('quote','hidden-secret',quote())
         with self.assertRaisesRegex(p.FeedError,'callback_normalization_failed'):inbox.check()
 
+    def test_stats_count_only_successful_enqueue_and_do_not_wait_for_lock(self):
+        inbox=p.CallbackQueue(['SPY.US'],maxsize=2,now=lambda:NOW,monotonic=lambda:12.5)
+        inbox.capture('quote','SPY.US',quote());inbox.capture('trade','SPY.US',trades())
+        inbox.capture('quote','SPY.US',quote())
+        stats=inbox.stats()
+        self.assertEqual(stats['enqueued_counts'],{'quote':1,'trade':1})
+        self.assertEqual(stats['last_callback_utc'],NOW.isoformat())
+        self.assertEqual(stats['last_callback_monotonic'],12.5)
+        self.assertEqual(stats['queue_depth'],2)
+        self.assertEqual(stats['failure'],'callback_queue_overflow')
+        with inbox.lock:
+            self.assertEqual(inbox.stats(),{'available':False,'diagnostic_error':'callback_stats_lock_busy'})
+
+    def test_normalization_failure_does_not_count_as_callback_progress(self):
+        inbox=p.CallbackQueue(['SPY.US'])
+        inbox.capture('quote','SPY.US',object())
+        self.assertEqual(inbox.stats()['enqueued_counts'],{'quote':0,'trade':0})
+        self.assertIsNone(inbox.stats()['last_callback_monotonic'])
+        self.assertEqual(inbox.stats()['failure'],'callback_normalization_failed')
+
+    def test_stall_watchdog_renews_only_on_callback_progress_and_never_after_stall(self):
+        clock=[100.0];handler=mock.Mock()
+        def baseline(*,file,all_threads):file.write(b'baseline\n')
+        handler.dump_traceback.side_effect=baseline
+        inbox=p.CallbackQueue(['SPY.US'],now=lambda:NOW,monotonic=lambda:clock[0])
+        with tempfile.TemporaryDirectory() as directory:
+            evidence=p.StallEvidence(Path(directory),'run',monotonic=lambda:clock[0],handler=handler)
+            evidence.start(inbox.stats())
+            self.assertEqual(handler.dump_traceback_later.call_args.args,(15,))
+            for value in (101,103,110):clock[0]=value;evidence.tick(inbox.stats())
+            self.assertEqual(handler.dump_traceback_later.call_count,1)
+            clock[0]=111;inbox.capture('quote','SPY.US',quote())
+            clock[0]=112;evidence.tick(inbox.stats())
+            self.assertEqual(handler.dump_traceback_later.call_args.args,(14,))
+            self.assertEqual(evidence.deadline,126)
+            clock[0]=127;evidence.tick(inbox.stats())
+            clock[0]=128;inbox.capture('trade','SPY.US',trades());evidence.tick(inbox.stats())
+            self.assertEqual(handler.dump_traceback_later.call_count,2)
+            handle=evidence.handle
+            handler.cancel_dump_traceback_later.side_effect=lambda:self.assertFalse(handle.closed)
+            evidence.close(inbox.stats())
+            self.assertTrue(handle.closed)
+            saved=json.loads((Path(directory)/'diagnostic.json').read_text())
+            self.assertTrue(saved['stall_deadline_elapsed'])
+            self.assertFalse(saved['stall_dump_observed']) # Fake timer does not prove a dump.
+            self.assertEqual(saved['native_network_root_cause'],'unproven')
+
+    def test_actual_c_watchdog_dumps_once_without_python_monitor_ticks(self):
+        # Isolate process-global faulthandler. No SDK imports or sockets.
+        program='''import json, sys, time
+from pathlib import Path
+from scripts import m15_windows_feed_producer as p
+p.CALLBACK_STALL_EVIDENCE_SECONDS=.08
+root=Path(sys.argv[1]); q=p.CallbackQueue(['SPY.US'])
+e=p.StallEvidence(root,'offline'); e.start(q.stats())
+time.sleep(.18)
+e.tick(q.stats()); size=e.handle.tell()
+time.sleep(.12)
+e.tick(q.stats()); e.close(q.stats())
+assert e.stall_dump_observed
+assert (root/'stack.private').read_text().count('Timeout (') == 1
+assert (root/'stack.private').stat().st_size == size
+assert e.closed
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            completed=subprocess.run([sys.executable,'-c',program,directory],capture_output=True,text=True,
+                                     cwd=Path(__file__).resolve().parents[2],timeout=5)
+            self.assertEqual(completed.returncode,0,completed.stderr)
+            self.assertEqual(completed.stdout,'')
+            self.assertEqual(completed.stderr,'')
+            if os.name != 'nt':
+                self.assertEqual((Path(directory)/'stack.private').stat().st_mode & 0o777,0o600)
+
+    def test_actual_c_watchdog_cancellation_leaves_only_baseline(self):
+        program='''import sys, time
+from pathlib import Path
+from scripts import m15_windows_feed_producer as p
+p.CALLBACK_STALL_EVIDENCE_SECONDS=.15
+root=Path(sys.argv[1]); q=p.CallbackQueue(['SPY.US'])
+e=p.StallEvidence(root,'offline'); e.start(q.stats()); e.close(q.stats())
+before=(root/'stack.private').read_bytes()
+time.sleep(.3)
+assert (root/'stack.private').read_bytes() == before
+assert b'Timeout (' not in before
+assert before and e.closed
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            completed=subprocess.run([sys.executable,'-c',program,directory],capture_output=True,text=True,
+                                     cwd=Path(__file__).resolve().parents[2],timeout=5)
+            self.assertEqual(completed.returncode,0,completed.stderr)
+            self.assertEqual(completed.stdout,'');self.assertEqual(completed.stderr,'')
+
+    def test_initial_watchdog_deadline_uses_last_callback_not_streaming_start(self):
+        clock=[10.0];handler=mock.Mock()
+        inbox=p.CallbackQueue(['SPY.US'],now=lambda:NOW,monotonic=lambda:clock[0])
+        inbox.capture('quote','SPY.US',quote());clock[0]=14
+        with tempfile.TemporaryDirectory() as directory:
+            evidence=p.StallEvidence(Path(directory),'run',monotonic=lambda:clock[0],handler=handler)
+            evidence.start(inbox.stats())
+            self.assertEqual(handler.dump_traceback_later.call_args.args,(11,))
+            self.assertEqual(evidence.deadline,25)
+            evidence.close(inbox.stats())
+
+    def test_diagnostic_failure_uses_fixed_code_and_never_overwrites_existing_stack(self):
+        with tempfile.TemporaryDirectory() as directory:
+            stack=Path(directory)/'stack.private';stack.write_text('original')
+            evidence=p.StallEvidence(Path(directory),'run',handler=mock.Mock())
+            evidence.start(p.CallbackQueue(['SPY.US']).stats())
+            self.assertEqual(evidence.error,'stall_evidence_start_failed')
+            self.assertEqual(stack.read_text(),'original')
+            self.assertNotIn(directory,(Path(directory)/'diagnostic.json').read_text())
+            evidence.close(None)
+
     def test_sequence_single_ordered_stream(self):
         output=io.StringIO();writer=p.WireWriter(output,'run',now=lambda:NOW)
         writer.emit('heartbeat',{});writer.emit('end',{'reason':'window_completed'})
@@ -138,10 +254,13 @@ class ProducerTests(unittest.TestCase):
             stages=[json.loads(line) for line in (Path(directory)/'stages.jsonl').read_text().splitlines()]
             self.assertEqual([row['phase'] for row in stages],['daily_context','streaming','completed'])
             self.assertEqual(json.loads((Path(directory)/'health.json').read_text())['status'],'observing')
+            health=json.loads((Path(directory)/'health.json').read_text())
+            self.assertEqual(health['heartbeat_scope'],'producer_main_loop_only')
+            self.assertEqual(health['sdk_health'],'unknown')
             summary=json.loads((Path(directory)/'summary.json').read_text())
             self.assertTrue(summary['completed_window']);self.assertFalse(summary['production_acceptance'])
 
-    def fake_run(self, *, late_daily=False):
+    def fake_run(self, *, late_daily=False, monitor=None, fail_stream=False):
         clock=[NOW]; mono=[0.0]; calls=[]; callbacks={}
         def sleep(seconds):clock[0]+=timedelta(seconds=seconds);mono[0]+=seconds
         class Context:
@@ -166,8 +285,14 @@ class ProducerTests(unittest.TestCase):
               'required_daily_date':'2026-09-23'}
         config={'market_data':{'daily_context_deadline_seconds':600,'market_holidays':[]}}
         output=io.StringIO();writer=p.WireWriter(output,'run',now=lambda:clock[0])
+        if fail_stream:
+            original=writer.emit
+            def emit(kind,payload):
+                if kind=='watermark':raise OSError('private exception detail')
+                original(kind,payload)
+            writer.emit=emit
         p.produce(sdk,config,spec,['SPY.US'],'fake-client',writer,now=lambda:clock[0],
-                  monotonic=lambda:mono[0],sleep=sleep)
+                  monotonic=lambda:mono[0],sleep=sleep,monitor=monitor)
         return [json.loads(line) for line in output.getvalue().splitlines()],calls
 
     def test_mock_sdk_single_subscription_complete_wire_watermark_and_end(self):
@@ -185,6 +310,21 @@ class ProducerTests(unittest.TestCase):
 
     def test_blocking_sdk_call_returning_after_deadline_cannot_subscribe(self):
         with self.assertRaisesRegex(p.FeedError,'initialization_window_expired'):self.fake_run(late_daily=True)
+
+    def test_producer_cancels_watchdog_on_success_and_wire_failure(self):
+        for fail in (False,True):
+            with self.subTest(fail=fail),tempfile.TemporaryDirectory() as directory:
+                monitor=p.Monitor(Path(directory),'run')
+                with mock.patch.object(p,'faulthandler') as handler:
+                    if fail:
+                        with self.assertRaises(OSError):self.fake_run(monitor=monitor,fail_stream=True)
+                    else:self.fake_run(monitor=monitor)
+                    handler.dump_traceback.assert_called_once()
+                    handler.cancel_dump_traceback_later.assert_called_once()
+                self.assertTrue(monitor.evidence.handle.closed)
+                saved=json.loads((Path(directory)/'diagnostic.json').read_text())
+                self.assertEqual(saved['callbacks']['enqueued_counts'],{'quote':1,'trade':1})
+                self.assertNotIn('private exception detail',json.dumps(saved))
 
     def test_endpoint_override_rejected_without_disclosing_value(self):
         with mock.patch.dict('os.environ',{'LONGBRIDGE_QUOTE_WS_URL':'secret-value'}):

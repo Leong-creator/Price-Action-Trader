@@ -81,3 +81,27 @@ class MainDurationIntegration(unittest.TestCase):
         for seconds in (24315.001,0,float('inf'),float('nan')):
             with self.subTest(seconds=seconds), self.assertRaisesRegex(ValueError,'deadline_out_of_range'):
                 c.run_case(Path('/no-case-needed'),seconds=seconds)
+
+
+class OfficialEnvironment(unittest.TestCase):
+    def test_official_optional_logger_and_endpoint_overrides_are_not_inherited(self):
+        inherited = {'PATH': 'ordinary-path', 'SYSTEMROOT': 'ordinary-system',
+                     'HTTPS_PROXY': 'keep-existing-proxy',
+                     'LONGBRIDGE_LOG_PATH': 'sensitive-directory',
+                     'LONGPORT_LOG_PATH': 'legacy-directory',
+                     'longbridge_log_path': 'case-insensitive-windows-name',
+                     'LONGBRIDGE_QUOTE_WS_URL': 'unapproved-endpoint',
+                     'PYTHONPATH': 'unapproved-code'}
+        with patch.dict(c.os.environ, inherited, clear=True):
+            before = dict(c.os.environ)  # Windows folds environment keys to uppercase.
+            env, removed = c.clean_environment()
+            self.assertEqual(dict(c.os.environ), before)
+        self.assertEqual(env, {k: inherited[k] for k in ('PATH', 'SYSTEMROOT', 'HTTPS_PROXY')})
+        self.assertEqual(set(removed), set(before) - set(env))
+        self.assertNotIn('sensitive-directory', str(removed))
+
+    def test_clean_environment_does_not_enable_optional_sdk_logging(self):
+        with patch.dict(c.os.environ, {'PATH': 'ordinary-path'}, clear=True):
+            env, removed = c.clean_environment()
+        self.assertEqual(env, {'PATH': 'ordinary-path'})
+        self.assertEqual(removed, [])

@@ -364,6 +364,27 @@ class RunOnceTests(unittest.TestCase):
         with patch.object(r,'archive_case',side_effect=archive):
             self.assertTrue(self.run_case()['credentials_cleaned'])
 
+    def test_archive_preserves_stall_diagnostics_with_verified_private_hashes(self):
+        case=self.layout.windows_root/r.CASE
+        contents={'diagnostic.json':b'{"scope":"python_thread_stacks_only"}',
+                  'stack.private':b'offline thread stack\n'}
+        for name,data in contents.items():(case/name).write_bytes(data)
+        (case/'not-allowlisted.private').write_bytes(b'not evidence')
+        self.assertEqual(r.archive_case(self.layout),2)
+        manifest=json.loads((self.layout.archive/'case-archive-manifest.private.json').read_text())
+        self.assertEqual({row['relative_path'] for row in manifest['files']},set(contents))
+        for row in manifest['files']:
+            target=self.layout.archive/r.CASE/row['relative_path']
+            self.assertEqual(target.read_bytes(),contents[row['relative_path']])
+            self.assertEqual(row['sha256'],hashlib.sha256(target.read_bytes()).hexdigest())
+            self.assertEqual(target.stat().st_mode & 0o777,0o600)
+        self.assertFalse((self.layout.archive/r.CASE/'not-allowlisted.private').exists())
+
+    def test_stall_archive_hash_mismatch_is_rejected(self):
+        (self.layout.windows_root/r.CASE/'stack.private').write_bytes(b'offline stack')
+        with patch.object(r,'stream_digest',return_value='wrong'):
+            with self.assertRaisesRegex(r.Refusal,'case_archive_mismatch'):r.archive_case(self.layout)
+
     def test_archive_failure_still_cleans_known_credential_after_exit(self):
         f = self
         with patch.object(r, 'archive_case', side_effect=OSError('fake archive full')):

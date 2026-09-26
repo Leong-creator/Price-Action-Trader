@@ -7,6 +7,7 @@ termination. This process never constructs an account or order context.
 from __future__ import annotations
 
 import argparse
+import faulthandler
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 import importlib.metadata
@@ -22,6 +23,7 @@ import time
 from typing import Any
 
 MAX_CALLBACKS = 250_000
+CALLBACK_STALL_EVIDENCE_SECONDS = 15
 
 
 class FeedError(RuntimeError):
@@ -143,10 +145,127 @@ def atomic_json(path: Path, payload: dict[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
+class StallEvidence:
+    """Local Python stacks only; no inference about native SDK/network health.
+
+    The standard-library C watchdog can dump even when the Python monitor cannot
+    run. It is armed only from successful callback progress, never heartbeats.
+    Its file stays open until cancellation; only one stall dump is permitted.
+    """
+    def __init__(self, directory, run_id, *, monotonic=None, handler=None):
+        self.directory, self.run_id = directory, run_id
+        self.monotonic = monotonic or time.monotonic
+        self.handler = handler or faulthandler
+        self.handle = None
+        self.baseline_bytes = None
+        self.deadline = None
+        self.progress = None
+        self.stall_latched = False
+        self.stall_dump_observed = False
+        self.closed = False
+        self.error = None
+        self.callbacks = None
+
+    def summary(self):
+        return {'scope': 'python_thread_stacks_only', 'native_network_root_cause': 'unproven',
+                'stall_seconds': CALLBACK_STALL_EVIDENCE_SECONDS,
+                'baseline_written': self.baseline_bytes is not None,
+                'watchdog_deadline_monotonic': self.deadline,
+                'stall_deadline_elapsed': self.stall_latched,
+                'stall_dump_observed': self.stall_dump_observed,
+                'closed': self.closed, 'diagnostic_error': self.error}
+
+    def _error(self, code):
+        if self.error is None:
+            self.error = code
+
+    def _save(self):
+        try:
+            atomic_json(self.directory / 'diagnostic.json', {
+                'schema_version': 1, 'run_id': self.run_id, **self.summary(),
+                'callbacks': self.callbacks,
+                'observed_at': timestamp(datetime.now(UTC)),
+                'observed_monotonic': self.monotonic()})
+        except Exception:
+            self._error('diagnostic_write_failed')
+
+    def _observe_dump(self):
+        if self.handle is not None and self.baseline_bytes is not None:
+            self.stall_dump_observed = (
+                os.fstat(self.handle.fileno()).st_size > self.baseline_bytes)
+            if self.stall_dump_observed:
+                self.stall_latched = True
+
+    def start(self, stats):
+        self.callbacks = stats
+        try:
+            fd = os.open(self.directory / 'stack.private', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            self.handle = os.fdopen(fd, 'wb', buffering=0)
+            self.handler.dump_traceback(file=self.handle, all_threads=True)
+            self.baseline_bytes = os.fstat(self.handle.fileno()).st_size
+            self.progress = (sum(stats['enqueued_counts'].values())
+                             if stats and stats.get('available') else None)
+            current = self.monotonic()
+            last_callback = stats.get('last_callback_monotonic') if stats and stats.get('available') else None
+            self.deadline = (last_callback if last_callback is not None else current) + CALLBACK_STALL_EVIDENCE_SECONDS
+            self.handler.dump_traceback_later(max(.001, self.deadline - current),
+                                             repeat=False, file=self.handle, exit=False)
+        except Exception:
+            self._error('stall_evidence_start_failed')
+        self._save()
+
+    def tick(self, stats):
+        self.callbacks = stats
+        try:
+            self._observe_dump()
+            current = self.monotonic()
+            # Even if a callback resumes after the deadline, never schedule a
+            # second dump. The C watchdog may still be completing the first.
+            if self.deadline is not None and current >= self.deadline:
+                self.stall_latched = True
+            if stats and stats.get('available') and not (self.error or self.closed or self.stall_latched):
+                progress = sum(stats['enqueued_counts'].values())
+                if progress != self.progress and stats['last_callback_monotonic'] is not None:
+                    deadline = stats['last_callback_monotonic'] + CALLBACK_STALL_EVIDENCE_SECONDS
+                    if deadline > current:
+                        self.handler.dump_traceback_later(deadline - current, repeat=False,
+                                                         file=self.handle, exit=False)
+                        self.deadline = deadline
+                        self.progress = progress
+        except Exception:
+            self._error('stall_evidence_tick_failed')
+        self._save()
+
+    def close(self, stats):
+        self.callbacks = stats
+        try:
+            # The fd must not be closed/reused while the C watchdog can write.
+            self.handler.cancel_dump_traceback_later()
+        except Exception:
+            self._error('stall_evidence_cancel_failed')
+            self._save()
+            return
+        try:
+            self._observe_dump()
+            if self.deadline is not None and self.monotonic() >= self.deadline:
+                self.stall_latched = True
+            if self.handle is not None:
+                self.handle.close()
+            self.closed = True
+        except Exception:
+            self._error('stall_evidence_close_failed')
+        self._save()
+
+
 class Monitor:
     def __init__(self, directory: Path, run_id: str):
         self.directory, self.run_id = directory, run_id
         self.sequence = 0
+        self.evidence = None
+
+    def start_evidence(self, callbacks) -> None:
+        self.evidence = StallEvidence(self.directory, self.run_id, monotonic=callbacks.monotonic)
+        self.evidence.start(callbacks.stats())
 
     def stage(self, phase: str) -> None:
         self.sequence += 1
@@ -155,10 +274,20 @@ class Monitor:
                          'phase': phase, 'phase_started_monotonic': time.monotonic()}) + '\n')
             handle.flush()
 
-    def health(self) -> None:
+    def health(self, callbacks=None) -> None:
+        stats = callbacks.stats() if callbacks is not None else None
+        if self.evidence is not None:
+            self.evidence.tick(stats)
         atomic_json(self.directory / 'health.json', {'run_id': self.run_id,
                     'phase': 'streaming', 'status': 'observing', 'reason': None,
+                    'heartbeat_scope': 'producer_main_loop_only', 'sdk_health': 'unknown',
+                    'callbacks': stats,
+                    'stall_evidence': self.evidence.summary() if self.evidence is not None else None,
                     'observed_monotonic': time.monotonic(), 'observed_at': timestamp(datetime.now(UTC))})
+
+    def close_evidence(self, callbacks) -> None:
+        if self.evidence is not None:
+            self.evidence.close(callbacks.stats())
 
     def finish(self, success: bool, reason=None, *, terminal_sequence=None, spec=None) -> None:
         atomic_json(self.directory / 'summary.json', {'run_id': self.run_id,
@@ -185,13 +314,17 @@ class WireWriter:
 
 
 class CallbackQueue:
-    def __init__(self, symbols: list[str], *, maxsize=MAX_CALLBACKS, now=None):
+    def __init__(self, symbols: list[str], *, maxsize=MAX_CALLBACKS, now=None, monotonic=None):
         self.symbols = frozenset(symbols)
         self.now = now or (lambda: datetime.now(UTC))
+        self.monotonic = monotonic or time.monotonic
         self.queue = queue.Queue(maxsize=maxsize)
         self.lock = threading.Lock()
         self.failure = None
         self.closed = False
+        self.enqueued_counts = {'quote': 0, 'trade': 0}
+        self.last_callback_utc = None
+        self.last_callback_monotonic = None
 
     def capture(self, kind: str, symbol: str, event: Any) -> None:
         # The same lock defines callback receipt order and watermark cuts.
@@ -200,14 +333,32 @@ class CallbackQueue:
                 return
             try:
                 received_at = timestamp(self.now())
+                received_monotonic = self.monotonic()
                 if symbol not in self.symbols or kind not in ('quote', 'trade'):
                     raise FeedError('unexpected_callback_identity')
                 payload = quote_payload(event) if kind == 'quote' else trade_payload(event)
                 self.queue.put_nowait((kind, {'symbol': symbol, 'received_at': received_at, 'event': payload}))
+                self.enqueued_counts[kind] += 1
+                self.last_callback_utc = received_at
+                self.last_callback_monotonic = received_monotonic
             except queue.Full:
                 self.failure = 'callback_queue_overflow'
             except Exception:
                 self.failure = 'callback_normalization_failed'
+
+    def stats(self):
+        # Never wait for a stuck callback merely to observe it. No SDK or I/O.
+        if not self.lock.acquire(blocking=False):
+            return {'available': False, 'diagnostic_error': 'callback_stats_lock_busy'}
+        try:
+            return {'available': True, 'counts_scope': 'successfully_enqueued_callbacks',
+                    'enqueued_counts': dict(self.enqueued_counts),
+                    'last_callback_utc': self.last_callback_utc,
+                    'last_callback_monotonic': self.last_callback_monotonic,
+                    'queue_depth': self.queue.qsize(), 'failure': self.failure,
+                    'closed': self.closed}
+        finally:
+            self.lock.release()
 
     def take_prefix(self, *, close=False):
         with self.lock:
@@ -263,7 +414,7 @@ def produce(sdk: Any, config: dict[str, Any], spec: dict[str, Any], symbols: lis
     if date.fromisoformat(spec['market_date']) != end.date():
         raise FeedError('market_date_window_mismatch')
     deadline = monotonic() + (end - launched).total_seconds()
-    callback_queue = CallbackQueue(symbols, now=now)
+    callback_queue = CallbackQueue(symbols, now=now, monotonic=monotonic)
     last_watermark = None
 
     def deadline_check():
@@ -328,14 +479,15 @@ def produce(sdk: Any, config: dict[str, Any], spec: dict[str, Any], symbols: lis
         writer.emit('ready', {'symbols': symbols})
         stage('streaming')
         if monitor is not None:
-            monitor.health()
+            monitor.start_evidence(callback_queue)
+            monitor.health(callback_queue)
         previous_heartbeat = monotonic()
         while now() < end and monotonic() < deadline:
             drain()
             current = monotonic()
             if current - previous_heartbeat >= 1:
                 if monitor is not None:
-                    monitor.health()
+                    monitor.health(callback_queue)
                 writer.emit('heartbeat', {'phase': 'streaming'})
                 previous_heartbeat = current
             sleep(.05)
@@ -345,6 +497,8 @@ def produce(sdk: Any, config: dict[str, Any], spec: dict[str, Any], symbols: lis
             raise FeedError('monotonic_deadline_before_window_end')
         writer.emit('end', {'reason': 'window_completed', 'received_through': last_watermark})
     finally:
+        if monitor is not None:
+            monitor.close_evidence(callback_queue)
         with callback_queue.lock:
             callback_queue.closed = True
         # SDK lifetime ends with process exit; external Job/controller verifies it.

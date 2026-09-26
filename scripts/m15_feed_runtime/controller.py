@@ -163,13 +163,14 @@ def write_json(path, obj, *, exclusive=True):
         handle.write('\n')
 
 
-def clean_environment(log_dir):
+def clean_environment():
     env = dict(os.environ)
     removed = sorted(key for key in env if key.upper().startswith(
         ('LONGBRIDGE_', 'LONGPORT_', 'M15_', 'PYTHON', 'LD_')))
     for key in removed:
         del env[key]
-    env['LONGBRIDGE_LOG_PATH'] = str(log_dir)
+    # Keep the official default: no optional synchronous SDK file logger.
+    # Original wire events and our bounded private diagnostics remain archived.
     return env, removed
 
 
@@ -215,13 +216,12 @@ def run_case(case, *, executable=None, root=None, seconds=60.0,
                           'controller_pid': os.getpid(), 'run_nonce':result.get('run_nonce'), 'started_at': result['started_at']})
         reserved = True
         write_json(case/'run_started.json', result)
-        log = case/'sdk-logs'
-        log.mkdir()
-        w.secure_directory(log, sd)
-        env, removed = clean_environment(log)
+        env, removed = clean_environment()
         result['removed_environment_names'] = removed
         result['python'] = str(executable)
-        result['official_sdk_log_directory'] = str(log)
+        result['official_sdk_log_directory'] = None
+        result['official_sdk_file_logging_enabled'] = False
+        result['official_sdk_log_policy'] = 'official_default_unset'
         job = w.check(w.CreateJobObjectW(None, None))
         limits = LIMIT()
         limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE; no breakaway.

@@ -318,7 +318,7 @@ def archive_case(layout):
     case = layout.windows_root / CASE
     destination = layout.archive / CASE
     destination.mkdir(mode=0o700)
-    allowed = {'run_started.json', 'run_result.json', 'stdout.private', 'stderr.private', 'events.ndjson', 'stages.jsonl', 'health.json', 'summary.json', 'health.json.tmp', 'summary.json.tmp', 'producer-summary.json'}
+    allowed = {'run_started.json', 'run_result.json', 'stdout.private', 'stderr.private', 'events.ndjson', 'stages.jsonl', 'health.json', 'summary.json', 'health.json.tmp', 'summary.json.tmp', 'producer-summary.json', 'diagnostic.json', 'stack.private'}
     files = [p for p in case.iterdir() if p.is_file() and p.name in allowed]
     logs = case / 'sdk-logs'
     if logs.exists():
