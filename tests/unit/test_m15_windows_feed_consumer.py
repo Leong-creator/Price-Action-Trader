@@ -171,6 +171,43 @@ class WindowsFeedConsumerTests(unittest.TestCase):
         self.assertEqual(self.c.last_error['code'], 'consumer_evidence_write_failed')
         self.assertEqual(self.c.evidence.strategy.evaluations, 0)
 
+    def test_empty_window_does_not_report_strategy_observation_finished(self):
+        self.ready()
+        self.now = self.end
+        self.send('end', {'reason': 'window_completed', 'received_through': self.end.isoformat()})
+        result = self.c.summary()
+        self.assertEqual(result['current_strategy_state'], 'not_evaluated_before_end')
+        self.assertEqual(result['strategy_blocked_reason'], 'no_accepted_complete_bar')
+        self.assertIsNone(result['last_judgment_at'])
+        self.assertFalse(result['bounded_pipeline_observed'])
+
+    def test_current_strategy_state_distinguishes_inputs_first_bar_and_history(self):
+        initial = self.c.live_status(now=self.now)
+        self.assertEqual(initial['current_strategy_state'], 'waiting_for_inputs')
+        self.assertIsNone(initial['last_judgment_at'])
+        self.ready()
+        waiting = self.c.summary()
+        self.assertEqual(waiting['current_strategy_state'], 'waiting_for_first_complete_bar')
+        self.assertEqual(waiting['strategy_blocked_reason'], 'no_accepted_complete_bar')
+        self.now = self.start.replace(minute=35, second=1)
+        for symbol in self.symbols:
+            self.quote(symbol); self.trades(symbol)
+        self.now = self.start.replace(minute=40, second=2)
+        for symbol in self.symbols:
+            self.quote(symbol)
+        self.send('watermark', {'received_through': self.now.isoformat()})
+        before = self.c.summary()
+        self.assertEqual(before['current_strategy_state'], 'observing')
+        self.assertIsNone(before['strategy_blocked_reason'])
+        self.assertEqual(before['last_judgment_at'], before['last_strategy_result']['evaluated_at'])
+        self.c.record_error(RuntimeError('reference_market_data_stalled'), now=self.now)
+        for blocked in (self.c.live_status(now=self.now), self.c.summary()):
+            self.assertEqual(blocked['current_strategy_state'], 'blocked')
+            self.assertEqual(blocked['strategy_blocked_reason'], 'reference_market_data_stalled')
+            self.assertEqual(blocked['last_judgment_at'], before['last_judgment_at'])
+            self.assertEqual(blocked['strategy_evaluation_count'], 1)
+        self.assertEqual(self.c.summary()['strategy_status'], before['strategy_status'])
+
     def test_actual_builder_and_original_router_equal_timestamp_trades_retained(self):
         self.ready()
         self.now = self.start.replace(minute=35, second=1)
@@ -193,6 +230,9 @@ class WindowsFeedConsumerTests(unittest.TestCase):
         result = self.c.summary()
         self.assertTrue(result['bounded_pipeline_observed'])
         self.assertFalse(result['strategy_full_acceptance'])
+        self.assertEqual(result['current_strategy_state'], 'observation_finished')
+        self.assertIsNone(result['strategy_blocked_reason'])
+        self.assertEqual(result['last_judgment_at'], result['last_strategy_result']['evaluated_at'])
         record = json.loads((self.root/'evidence/strategy/boundary_decisions.jsonl').read_text())
         self.assertEqual(len(record['allowed_runtime_ids']), 8)
         self.assertTrue(any(x['input_status'] == 'insufficient_declared_context' for x in record['runtime_context']))

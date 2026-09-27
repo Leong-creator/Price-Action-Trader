@@ -96,6 +96,12 @@ class IntradayCaptureTests(unittest.TestCase):
         self.assertEqual(result['strategy_evaluation_count'], 1)
         self.assertTrue(result['diagnostic_capture_complete'])
         self.assertFalse(result['bounded_pipeline_observed'])
+        for report in (result, self.c.live_status(now=self.now)):
+            self.assertEqual(report['current_strategy_state'], 'blocked')
+            self.assertEqual(report['strategy_blocked_reason'], 'trade_source_delivery_age_exceeded')
+            self.assertEqual(report['last_judgment_at'], result['last_strategy_result']['evaluated_at'])
+            self.assertEqual(report['strategy_evaluation_count'], 1)
+        self.assertEqual(result['strategy_status'], 'judgments_recorded_partial_intraday_context')
 
     def test_partially_appended_fault_batch_is_frozen_and_never_replayed(self):
         self.now = self.start.replace(minute=35, second=2, microsecond=49167)

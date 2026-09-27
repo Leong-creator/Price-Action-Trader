@@ -315,6 +315,25 @@ class FeedConsumer:
                 for name, value in row.items()} for key, row in self.diagnostic_reference_progress.items()},
             'diagnostic_progress_basis': 'source_timestamp_advancement_not_strategy_quality'}
 
+    def _current_strategy_state(self, reason=None):
+        """Current ability to judge is separate from historical judgment counters."""
+        fault = self.first_quality_fault or self.last_error
+        blocked = fault['code'] if fault else reason
+        if blocked:
+            state = 'blocked'
+        elif self.ended:
+            state = 'observation_finished' if self.evidence.strategy.evaluations else 'not_evaluated_before_end'
+            blocked = None if self.evidence.strategy.evaluations else 'no_accepted_complete_bar'
+        elif not self.ready:
+            state, blocked = 'waiting_for_inputs', 'feed_not_ready'
+        elif not self.evidence.strategy.evaluations:
+            state, blocked = 'waiting_for_first_complete_bar', 'no_accepted_complete_bar'
+        else:
+            state = 'observing'
+        return {'current_strategy_state': state, 'strategy_blocked_reason': blocked,
+            'last_judgment_at': self.evidence.strategy.last_result.get('evaluated_at'),
+            'strategy_history_basis': 'counts_and_last_strategy_result_are_historical_not_current_readiness'}
+
     def _append_evidence(self, filename, rows):
         try:
             with (self.output/filename).open('a', encoding='utf-8') as out:
@@ -712,6 +731,7 @@ class FeedConsumer:
             'bar_count': self.evidence.bar_count,
             'strategy_evaluation_count': self.evidence.strategy.evaluations,
             'producer_end_observed': self.ended, 'last_error': self.last_error, **self._diagnostic_state(),
+            **self._current_strategy_state(),
             'production_acceptance': False, 'full_session_acceptance': False}
 
     def write_status(self, *, now=None, force=False):
@@ -773,7 +793,8 @@ class FeedConsumer:
             'last_error': self.last_error,
             'last_watermark': self.watermark.isoformat() if self.watermark else None,
             'strategy_full_acceptance': False, 'full_session_acceptance': False,
-            'production_acceptance': False, 'account_access': False, 'order_access': False, **strategy}
+            'production_acceptance': False, 'account_access': False, 'order_access': False, **strategy,
+            **self._current_strategy_state(reason)}
 
 
 def main():

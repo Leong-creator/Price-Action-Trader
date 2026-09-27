@@ -155,6 +155,30 @@ class Daily(unittest.TestCase):
         self.assertFalse(report['data_current'])
         self.assertNotIn('private-token',json.dumps(report))
 
+    def test_terminal_strategy_state_does_not_relabel_historical_judgment_as_active(self):
+        run_id,_=self.failed_result()
+        self.put('consumer-output/summary.json',{'run_id':run_id,
+            'last_error':{'code':'reference_market_data_stalled'},
+            'strategy_status':'judgments_recorded_partial_intraday_context',
+            'current_strategy_state':'blocked',
+            'strategy_blocked_reason':'reference_market_data_stalled',
+            'last_judgment_at':'2026-09-25T13:35:02+00:00'})
+        report=self.terminal_status()
+        self.assertEqual(report['current_strategy_state'],'blocked')
+        self.assertEqual(report['strategy_blocked_reason'],'reference_market_data_stalled')
+        self.assertEqual(report['last_judgment_at'],'2026-09-25T13:35:02+00:00')
+        self.put('consumer-output/summary.json',{'run_id':'other-run',
+            'current_strategy_state':'observing'})
+        self.assertIsNone(self.terminal_status().get('current_strategy_state'))
+
+    def test_strategy_status_unknown_text_and_timestamp_are_not_exposed(self):
+        fields=daily.strategy_status_fields({'current_strategy_state':['private'],
+            'strategy_blocked_reason':'private-token-do-not-print',
+            'last_judgment_at':'private-token-do-not-print'})
+        self.assertEqual(fields,{'current_strategy_state':None,
+                                 'strategy_blocked_reason':'unclassified_exception','last_judgment_at':None})
+        self.assertNotIn('private-token',json.dumps(fields))
+
     def test_terminal_existing_outer_error_remains_authoritative(self):
         run_id,result=self.failed_result()
         result['error']='guardian_exit_unverified_credentials_retained'

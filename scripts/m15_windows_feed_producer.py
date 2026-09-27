@@ -7,6 +7,7 @@ termination. This process never constructs an account or order context.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import faulthandler
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -376,9 +377,43 @@ class CallbackQueue:
                 raise FeedError(self.failure)
 
 
+def native_environment_present(name: str) -> bool:
+    """Rust dotenv changes native environment without refreshing os.environ."""
+    try:
+        if os.name == 'nt':
+            kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+            query = kernel.GetEnvironmentVariableW
+            query.argtypes = (ctypes.c_wchar_p, ctypes.c_void_p, ctypes.c_uint32)
+            query.restype = ctypes.c_uint32
+            ctypes.set_last_error(0)
+            size = query(name, None, 0)
+            if size == 0 and ctypes.get_last_error() not in (0, 203):
+                raise FeedError('native_environment_read_failed')
+            return size > 0 or ctypes.get_last_error() == 0
+        query = ctypes.CDLL(None).getenv
+        query.argtypes = (ctypes.c_char_p,)
+        query.restype = ctypes.c_void_p
+        return query(name.encode('ascii')) is not None
+    except FeedError:
+        raise
+    except Exception:
+        raise FeedError('native_environment_read_failed') from None
+
+
 def reject_overrides() -> None:
+    # Config.from_oauth can load a newly added ancestor .env. Recheck after
+    # construction, before QuoteContext, so the audited logging policy holds.
+    if (any(name.upper() in ('LONGBRIDGE_LOG_PATH', 'LONGPORT_LOG_PATH')
+            for name in os.environ)
+            or any(native_environment_present(name) for name in
+                   ('LONGBRIDGE_LOG_PATH', 'LONGPORT_LOG_PATH'))):
+        raise FeedError('official_sdk_log_override_rejected')
     if any(value and name.startswith(('LONGBRIDGE_', 'LONGPORT_'))
            and name.endswith(('URL', 'REGION')) for name, value in os.environ.items()):
+        raise FeedError('official_endpoint_override_rejected')
+    if any(native_environment_present(prefix + suffix)
+           for prefix in ('LONGBRIDGE_', 'LONGPORT_')
+           for suffix in ('HTTP_URL', 'QUOTE_WS_URL', 'TRADE_WS_URL', 'REGION')):
         raise FeedError('official_endpoint_override_rejected')
 
 

@@ -319,6 +319,23 @@ def terminal_failure(result,archive,consumer_dir,run_id):
     return 'daily_feed_failure_reason_unavailable','unavailable'
 
 
+def strategy_status_fields(value):
+    """Expose current state separately from historical router counts."""
+    states={'blocked','observation_finished','not_evaluated_before_end',
+            'waiting_for_inputs','waiting_for_first_complete_bar','observing'}
+    state=value.get('current_strategy_state')
+    reason=value.get('strategy_blocked_reason')
+    reason=(reason if reason in ('feed_not_ready','no_accepted_complete_bar')
+            else safe_terminal_error(reason))
+    last=value.get('last_judgment_at')
+    try:
+        last=bootstrap.utc(last).isoformat() if isinstance(last,str) else None
+    except (ValueError,TypeError,RuntimeError):
+        last=None
+    return {'current_strategy_state':state if isinstance(state,str) and state in states else None,
+            'strategy_blocked_reason':reason,'last_judgment_at':last}
+
+
 def status(config_path,market_date=None,*,root=REPO,now=None,session_key=None):
     now=now or datetime.now(timezone.utc);day=market_date or today(now)
     _,config=config_at(config_path,root)
@@ -390,6 +407,9 @@ def status(config_path,market_date=None,*,root=REPO,now=None,session_key=None):
                     break
             report['finalization_errors']={key: safe_terminal_error(result[key])
                 for key in ('cleanup_error','archive_error','clock_finalization_error') if result.get(key)}
+        terminal=maybe(Path(manifest['consumer']['output_dir'])/'summary.json')
+        if isinstance(terminal,dict) and terminal.get('run_id')==run_id:
+            report.update(strategy_status_fields(terminal))
         report['data_current']=False
         return report
     used=any((archive/name).exists() for name in ('launch-reservation.json','host-launch-started.json','run-once-started.json'))
@@ -407,6 +427,7 @@ def status(config_path,market_date=None,*,root=REPO,now=None,session_key=None):
         last_error=live.get('last_error'),source_receipt=live.get('last_source_receipt'),
         processing_updated_at=live.get('last_processed_at'),consumer_observed_at=live.get('observed_at'),
         counts={key:live.get(key) for key in ('bar_count','complete_boundary_count','strategy_evaluation_count','trade_count','quote_wire_symbol_count','trade_wire_symbol_count')})
+    report.update(strategy_status_fields(live))
     try:
         def fresh(value,limit):
             age=(now-bootstrap.utc(value)).total_seconds();return -0.5<=age<=limit

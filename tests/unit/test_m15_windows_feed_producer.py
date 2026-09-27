@@ -326,6 +326,65 @@ assert before and e.closed
                 self.assertEqual(saved['callbacks']['enqueued_counts'],{'quote':1,'trade':1})
                 self.assertNotIn('private exception detail',json.dumps(saved))
 
+    def test_native_sdk_environment_change_bypasses_python_cache_but_is_rejected(self):
+        # Separate process: do not leave a native-only environment mutation in unittest.
+        code = r"""
+import ctypes, os, sys
+sys.path.insert(0, sys.argv[1])
+from scripts import m15_windows_feed_producer as p
+name = 'LONGBRIDGE_LOG_PATH'
+os.environ.pop(name, None)
+if os.name == 'nt':
+    fn = ctypes.WinDLL('kernel32', use_last_error=True).SetEnvironmentVariableW
+    fn.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p)
+    fn.restype = ctypes.c_int
+    assert fn(name, sys.argv[2])
+else:
+    fn = ctypes.CDLL(None).setenv
+    fn.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int)
+    fn.restype = ctypes.c_int
+    assert fn(name.encode(), sys.argv[2].encode(), 1) == 0
+assert name not in os.environ
+assert p.native_environment_present(name)
+try:
+    p.reject_overrides()
+except p.FeedError as error:
+    assert str(error) == 'official_sdk_log_override_rejected'
+else:
+    raise AssertionError('native log override was not rejected')
+"""
+        for value in ('native-only-private-value', ''):
+            with self.subTest(empty=not value):
+                result = subprocess.run([sys.executable, '-I', '-S', '-B', '-c', code,
+                                         str(Path(p.__file__).resolve().parents[1]), value],
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, '')
+
+    def test_sdk_dotenv_log_override_rejected_before_context(self):
+        called = []
+        def from_oauth(_oauth):
+            p.os.environ['LONGBRIDGE_LOG_PATH'] = 'private-do-not-print'
+            return 'config'
+        sdk = NS(OAuthBuilder=lambda _client: NS(build=lambda _callback: 'oauth'),
+                 Config=NS(from_oauth=from_oauth),
+                 QuoteContext=lambda config: called.append('context'))
+        spec = {'window_start_utc': NOW.isoformat(),
+                'latest_start_utc': (NOW+timedelta(seconds=60)).isoformat(),
+                'window_end_utc': (NOW+timedelta(minutes=10)).isoformat(),
+                'market_date': NOW.date().isoformat()}
+        with mock.patch.dict(p.os.environ, {}, clear=True):
+            with self.assertRaisesRegex(p.FeedError, '^official_sdk_log_override_rejected$'):
+                p.produce(sdk, {}, spec, ['SPY.US'], 'fake-client',
+                          p.WireWriter(io.StringIO(), 'run'), now=lambda: NOW)
+        self.assertEqual(called, [])
+
+    def test_legacy_or_mixed_case_log_override_is_rejected(self):
+        for name in ('LONGPORT_LOG_PATH', 'longbridge_log_path'):
+            with self.subTest(name=name), mock.patch.dict(p.os.environ, {name: 'private'}, clear=True):
+                with self.assertRaisesRegex(p.FeedError, '^official_sdk_log_override_rejected$'):
+                    p.reject_overrides()
+
     def test_endpoint_override_rejected_without_disclosing_value(self):
         with mock.patch.dict('os.environ',{'LONGBRIDGE_QUOTE_WS_URL':'secret-value'}):
             with self.assertRaisesRegex(p.FeedError,'official_endpoint_override_rejected'):p.reject_overrides()
