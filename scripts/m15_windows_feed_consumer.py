@@ -417,6 +417,10 @@ class FeedConsumer:
         seq = row.get('sequence') if isinstance(row, dict) else None
         self.attempted_sequence = seq if type(seq) is int and 0 < seq < 2**63 else None
         try:
+            # Reject a wall-clock discontinuity before any input mutation, bar
+            # sealing, strategy judgment or terminal-end acceptance. Liveness
+            # remains checked after the already-written prefix is consumed.
+            self._check_clock_continuity(now)
             self._consume_record(row, now=now)
         except BaseException as error:
             self.record_error(error, now=now, during='consume')
@@ -681,11 +685,14 @@ class FeedConsumer:
             self.record_error(error, now=now, during='deadline_check')
             raise
 
-    def _check(self, *, now=None):
-        now = stamp(now or datetime.now(UTC))
+    def _check_clock_continuity(self, now):
         elapsed = time.monotonic() - self.started_mono
         if not math.isfinite(elapsed) or abs((now - self.started_wall).total_seconds() - elapsed) > 2:
             raise ValueError('consumer_clock_discontinuity')
+
+    def _check(self, *, now=None):
+        now = stamp(now or datetime.now(UTC))
+        self._check_clock_continuity(now)
         if now > self.end + timedelta(seconds=5):
             raise ValueError('wire_end_deadline_exceeded')
         if self.first_quality_fault is not None:

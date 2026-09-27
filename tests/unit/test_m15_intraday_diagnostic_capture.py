@@ -217,6 +217,34 @@ class IntradayCaptureTests(unittest.TestCase):
                 self.c.check(now=self.now)
         self.assert_fatal_drain('consumer_clock_discontinuity', jumped)
 
+    def test_frozen_diagnostic_clock_jump_cannot_advance_raw_progress(self):
+        self.fault()
+        before = copy.deepcopy(self.c.diagnostic_reference_progress)
+        sequence = self.c.last_consumed_sequence
+        received = self.c.last_processed_at
+        mono = consumer.time.monotonic()
+        self.now += timedelta(seconds=3)
+        with patch.object(consumer.time, 'monotonic', return_value=mono):
+            with self.assertRaisesRegex(ValueError, '^consumer_clock_discontinuity$'):
+                self.quote('QQQ.US')
+        self.assertEqual(self.c.diagnostic_reference_progress, before)
+        self.assertEqual(self.c.last_consumed_sequence, sequence)
+        self.assertEqual(self.c.last_processed_at, received)
+        self.assertEqual(self.c.evidence.strategy.evaluations, 0)
+        self.assertFalse(self.c.summary()['diagnostic_capture_complete'])
+
+    def test_frozen_diagnostic_terminal_clock_jump_is_rejected_before_end(self):
+        self.fault()
+        self.now = self.end
+        mono = self.c.started_mono+(self.now-self.start).total_seconds()+3
+        sequence = self.c.last_consumed_sequence
+        with patch.object(consumer.time, 'monotonic', return_value=mono):
+            with self.assertRaisesRegex(ValueError, '^consumer_clock_discontinuity$'):
+                self.send('end', {'reason': 'window_completed', 'received_through': self.end.isoformat()})
+        self.assertFalse(self.c.ended)
+        self.assertEqual(self.c.last_consumed_sequence, sequence)
+        self.assertEqual(self.c.last_error['during'], 'consume')
+
     def test_drain_wire_silence_stops(self):
         def silent():
             self.now += timedelta(seconds=6)

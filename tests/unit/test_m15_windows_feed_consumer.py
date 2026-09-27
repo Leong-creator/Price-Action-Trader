@@ -3,6 +3,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 import json
+import copy
 import io
 from pathlib import Path
 import socket
@@ -32,6 +33,10 @@ class WindowsFeedConsumerTests(unittest.TestCase):
         self.start = datetime(2026, 9, 24, 13, 30, 1, tzinfo=UTC)
         self.end = datetime(2026, 9, 24, 13, 40, 5, tzinfo=UTC)
         self.now = self.start
+        # Ordinary fixtures advance wall and monotonic time together. Specific
+        # discontinuity tests freeze/offset this clock explicitly.
+        self.stack.enter_context(patch.object(consumer.time, 'monotonic',
+            side_effect=lambda: 1000.0+(self.now-self.start).total_seconds()))
         self.config = replace(runtime.load_config(), output_dir=self.root/'unused',
             market_events_path=self.root/'market', runtime_status_path=self.root/'state',
             readonly_gate_path=self.root/'gate', daily_context_path=self.root/'daily',
@@ -144,7 +149,7 @@ class WindowsFeedConsumerTests(unittest.TestCase):
         self.now = self.start.replace(minute=40, second=2)
         for symbol in self.symbols:
             self.quote(symbol)
-        mono = [100.0]
+        mono = [consumer.time.monotonic()]
         original = self.c._append_evidence
         def slow(filename, rows):
             original(filename, rows)
@@ -155,6 +160,7 @@ class WindowsFeedConsumerTests(unittest.TestCase):
                 self.send('watermark', {'received_through': self.now.isoformat()})
         self.assertEqual(self.c.evidence.strategy.evaluations, 0)
         self.assertIsNotNone(self.c.last_error)
+        self.assertNotEqual(self.c.last_error['code'], 'consumer_clock_discontinuity')
 
     def test_evidence_write_failure_cannot_leave_healthy_boundary(self):
         self.ready()
@@ -236,6 +242,69 @@ class WindowsFeedConsumerTests(unittest.TestCase):
         record = json.loads((self.root/'evidence/strategy/boundary_decisions.jsonl').read_text())
         self.assertEqual(len(record['allowed_runtime_ids']), 8)
         self.assertTrue(any(x['input_status'] == 'insufficient_declared_context' for x in record['runtime_context']))
+
+    def assert_preconsume_clock_rejected(self, kind, jump_seconds, *, diagnostic_mode=False):
+        self.c.diagnostic_capture_after_quality_fault = diagnostic_mode
+        self.ready()
+        self.now = self.start.replace(minute=35, second=1)
+        for symbol in self.symbols:
+            self.quote(symbol); self.trades(symbol)
+        self.now = self.start.replace(minute=39, second=59)
+        for symbol in self.symbols:
+            self.quote(symbol)
+        self.now = self.end if kind == 'end' else self.start.replace(minute=40, second=2)
+        mono = 1000.0+(self.now-self.start).total_seconds()-jump_seconds
+        payload = ({'reason': 'window_completed', 'received_through': self.end.isoformat()}
+                   if kind == 'end' else {'received_through': self.now.isoformat()})
+        before = {'sequence': self.c.sequence, 'last_consumed_sequence': self.c.last_consumed_sequence,
+            'last_processed_at': self.c.last_processed_at, 'watermark': self.c.watermark,
+            'emitted': self.c.emitted, 'counts': dict(self.c.counts), 'latest': copy.deepcopy(self.c.latest_by_symbol),
+            'bars': copy.deepcopy(self.c.builder._bars), 'closed': set(self.c.builder._emitted_boundaries)}
+        with patch.object(consumer.time, 'monotonic', return_value=mono):
+            with self.assertRaisesRegex(ValueError, '^consumer_clock_discontinuity$'):
+                self.send(kind, payload)
+        after = {'sequence': self.c.sequence, 'last_consumed_sequence': self.c.last_consumed_sequence,
+            'last_processed_at': self.c.last_processed_at, 'watermark': self.c.watermark,
+            'emitted': self.c.emitted, 'counts': dict(self.c.counts), 'latest': self.c.latest_by_symbol,
+            'bars': self.c.builder._bars, 'closed': self.c.builder._emitted_boundaries}
+        self.assertEqual(after, before)
+        self.assertEqual(self.c.evidence.bar_count, 0)
+        self.assertEqual(self.c.evidence.strategy.evaluations, 0)
+        self.assertFalse(self.c.ended)
+        self.assertEqual(self.c.last_error['during'], 'consume')
+        self.assertEqual(self.c.last_error['code'], 'consumer_clock_discontinuity')
+        self.assertFalse((self.c.output/'bar-evidence.jsonl').exists())
+        self.assertFalse((self.c.output/'strategy/boundary_decisions.jsonl').exists())
+
+    def test_clock_forward_jump_prevents_watermark_from_sealing_or_routing(self):
+        self.assert_preconsume_clock_rejected('watermark', 3)
+
+    def test_clock_backward_jump_prevents_watermark_from_sealing_or_routing(self):
+        self.assert_preconsume_clock_rejected('watermark', -3)
+
+    def test_clock_forward_jump_prevents_terminal_end_acceptance(self):
+        self.assert_preconsume_clock_rejected('end', 3)
+
+    def test_clock_backward_jump_prevents_terminal_end_acceptance(self):
+        self.assert_preconsume_clock_rejected('end', -3)
+
+    def test_diagnostic_clock_forward_jump_prevents_watermark_from_routing(self):
+        self.assert_preconsume_clock_rejected('watermark', 3, diagnostic_mode=True)
+
+    def test_diagnostic_clock_backward_jump_prevents_terminal_end_acceptance(self):
+        self.assert_preconsume_clock_rejected('end', -3, diagnostic_mode=True)
+
+    def test_clock_continuity_keeps_original_two_second_boundary(self):
+        self.ready()
+        self.now += timedelta(seconds=1)
+        expected = 1000.0+(self.now-self.start).total_seconds()
+        with patch.object(consumer.time, 'monotonic', return_value=expected-2):
+            self.send('heartbeat', {'phase': 'streaming'})
+        before = self.c.last_consumed_sequence
+        with patch.object(consumer.time, 'monotonic', return_value=expected-2.001):
+            with self.assertRaisesRegex(ValueError, '^consumer_clock_discontinuity$'):
+                self.send('heartbeat', {'phase': 'streaming'})
+        self.assertEqual(self.c.last_consumed_sequence, before)
 
     def test_wrong_run_and_sequence_rejected(self):
         for changes in ({'run_id': str(uuid4())}, {'sequence': 2}, {'sequence': True}):
